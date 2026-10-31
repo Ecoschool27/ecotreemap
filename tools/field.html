@@ -49,12 +49,21 @@
       <input type="number" id="f-year" min="1900" step="1" inputmode="numeric">
       <label for="f-date">Дата посадки (если известна)</label>
       <input type="date" id="f-date">
+      <div id="box-species-note" hidden>
+        <label for="f-species-note">Название породы (обязательно, до 60 знаков)</label>
+        <input type="text" id="f-species-note" maxlength="60" autocomplete="off">
+      </div>
     </div>
     <div id="box-inspect" hidden>
       <p class="muted" id="nearest-hint">Ближайшие отмеченные деревья появятся после включения GPS.</p>
       <div id="nearest-list" class="btn-row"></div>
       <label for="f-inspect-id">Номер дерева (с таблички)</label>
       <input type="text" id="f-inspect-id" maxlength="6" autocomplete="off" placeholder="например, L-001">
+    </div>
+    <div id="box-water" hidden>
+      <label class="check"><input type="checkbox" id="f-watered"> Полил(а) дерево (дата — дата осмотра)</label>
+      <button type="button" class="btn btn--water btn--block" id="btn-water-quick">Полил(а) — сохранить сразу</button>
+      <p class="muted">Отметка полива появится на сайте после выгрузки и добавления координатором.</p>
     </div>
     <p class="muted" id="tree-facts" aria-live="polite"></p>
   </section>

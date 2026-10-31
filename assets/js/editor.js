@@ -32,6 +32,10 @@
     "//   в папке images/; photo_date — дата снимка; observations — история осмотров [{date, status, notes}]",
     "//   (до 10, новые сверху); coord_accuracy_m — точность GPS в метрах; coord_source — gps | gps-low | gps+manual | manual",
     "//   (gps-low — GPS хуже порога точности, место приблизительное; manual — поставлено вручную на карте).",
+    "// Номера новых пород: префикс из data/species.js (1–2 буквы: TB-001); species \"other\" — «Другая порода»,",
+    "//   её название — в species_note (до 60 знаков). observations[].watered = true — отметка полива;",
+    "//   observations[].photo — фото осмотра \"trees/<номер>/<ГГГГ-ММ-ДД>.jpg\" (photo дерева — последнее фото).",
+    "// Шефство (только tools/editor.html): patron — класс или группа (до 80 знаков, без имён); patron_since — дата.",
     "// Не вписывайте сюда числа и факты без подтверждения."
   ];
 
@@ -59,6 +63,25 @@
     return s.length + ':' + ('0000000' + h.toString(16)).slice(-8);
   }
 
+  // Шефство дерева: [patron, patron_since] или null.
+  function patronOf(t) {
+    return ECO.hasOwn(t, 'patron') && typeof t.patron === 'string' && t.patron
+      ? [t.patron, typeof t.patron_since === 'string' ? t.patron_since : null] : null;
+  }
+  function samePatron(a, b) {
+    if (!a || !b) return !a && !b;
+    return a[0] === b[0] && a[1] === b[1];
+  }
+  function setPatron(t, v) {
+    if (v) {
+      t.patron = v[0];
+      t.patron_since = v[1];
+    } else {
+      delete t.patron;
+      delete t.patron_since;
+    }
+  }
+
   function main() {
     if (!Array.isArray(window.ECO_TREES) || !window.ECO_SPECIES) {
       ECO.showFatal('Данные не загрузились', ['Не найдены data/trees.js или data/species.js рядом с папкой tools/.']);
@@ -80,6 +103,8 @@
     var ids = Object.keys(byId);
     var baseCoords = Object.create(null); // координаты из загруженного data/trees.js — от них считается черновик
     ids.forEach(function (id) { baseCoords[id] = coordsOf(byId[id]); });
+    var basePatron = Object.create(null); // шефство из загруженного data/trees.js
+    ids.forEach(function (id) { basePatron[id] = patronOf(byId[id]); });
 
     var $ = function (id) { return document.getElementById(id); };
     var selSpecies = $('sel-species');
@@ -118,8 +143,12 @@
       var k = byId[id].species;
       if (speciesKeys.indexOf(k) === -1) speciesKeys.push(k);
     });
+    Object.keys(species).forEach(function (k) {
+      if (speciesKeys.indexOf(k) === -1 && species[k]) speciesKeys.push(k);
+    });
     speciesKeys.forEach(function (k) {
-      selSpecies.appendChild(el('option', { value: k, text: speciesName(k) }));
+      var count = ids.filter(function (id) { return byId[id].species === k; }).length;
+      selSpecies.appendChild(el('option', { value: k, text: speciesName(k) + (count ? '' : ' — деревьев нет') }));
     });
 
     function fillYears() {
@@ -237,9 +266,31 @@
       say(label + '. ' + nextHint());
     }
 
+    function applyPatron(label, changes) {
+      changes = changes.filter(function (ch) { return !samePatron(patronOf(byId[ch.id]), ch.after); });
+      if (!changes.length) {
+        say(label + ': ничего не изменилось.');
+        return 0;
+      }
+      changes.forEach(function (ch) {
+        ch.before = patronOf(byId[ch.id]);
+        setPatron(byId[ch.id], ch.after);
+      });
+      undoStack.push({ label: label, patron: true, changes: changes });
+      refresh(true);
+      say(label + ' — ' + changes.length + ' ' + ECO.treesWord(changes.length) + '. Не забудьте скачать trees.js.');
+      return changes.length;
+    }
+
     function undo() {
       var a = undoStack.pop();
       if (!a) return;
+      if (a.patron) {
+        a.changes.forEach(function (ch) { setPatron(byId[ch.id], ch.before); });
+        refresh(true);
+        say('Отменено: ' + a.label + '.');
+        return;
+      }
       a.changes.forEach(function (ch) {
         setCoords(ch.id, ch.before);
         restoreMeta(ch.id, ch.beforeMeta);
@@ -408,6 +459,15 @@
       });
       return n ? out : null;
     }
+    function draftPatrons() {
+      var out = Object.create(null);
+      var n = 0;
+      ids.forEach(function (id) {
+        var v = patronOf(byId[id]);
+        if (!samePatron(v, basePatron[id])) { out[id] = v; n++; }
+      });
+      return n ? out : null;
+    }
     function removeDraft() {
       ECO.storageRemove(DRAFT_KEY);
       LEGACY_DRAFT_KEYS.forEach(function (k) { ECO.storageRemove(k); });
@@ -415,11 +475,13 @@
     function saveDraft() {
       if (draftPending) return; // не затирать черновик, пока пользователь не решил, что с ним делать
       var diff = draftDiff();
-      if (!diff) {
+      var pd = draftPatrons();
+      if (!diff && !pd) {
         ECO.storageRemove(DRAFT_KEY);
         return;
       }
-      ECO.storageSet(DRAFT_KEY, JSON.stringify({ format: 2, saved_at: new Date().toISOString(), base: BASE_FP, coords: diff }));
+      ECO.storageSet(DRAFT_KEY, JSON.stringify({ format: 2, saved_at: new Date().toISOString(), base: BASE_FP, coords: diff || {},
+        patrons: pd || {} }));
     }
     function clearDraftAfterExport() {
       if (draftPending) return ' Черновик в браузере не тронут — сначала решите, что с ним делать (рамка вверху).';
@@ -460,6 +522,24 @@
       });
       return changes;
     }
+    // Шефство из черновика: только номера реестра, строка ≤80 и дата ГГГГ-ММ-ДД (или null).
+    function draftPatronChanges(draft) {
+      var out = [];
+      var src = draft.patrons;
+      if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+      Object.keys(src).forEach(function (id) {
+        if (!ECO.ID_RE.test(id) || !ECO.hasOwn(byId, id)) return;
+        var v = src[id];
+        var after = null;
+        if (v !== null) {
+          if (!Array.isArray(v) || typeof v[0] !== 'string' || !v[0].trim() || v[0].length > ECO.PATRON_MAX ||
+              (v[1] !== null && !ECO.parseDate(v[1]))) return;
+          after = [v[0], v[1]];
+        }
+        if (!samePatron(patronOf(byId[id]), after)) out.push({ id: id, after: after });
+      });
+      return out;
+    }
     function draftWhen(draft) {
       var when = new Date(draft.saved_at);
       return isNaN(when.getTime()) ? '' : ' от ' + when.toLocaleString('ru-RU');
@@ -497,7 +577,9 @@
       if (!found) return;
       var draft = found.draft;
       var changes = draftChanges(draft);
-      if (!changes.length) {
+      var patronChanges = draftPatronChanges(draft);
+      changes.patrons = patronChanges;
+      if (!changes.length && !patronChanges.length) {
         removeDraft(); // черновик ничем не отличается от загруженного — терять нечего
         return;
       }
@@ -508,8 +590,8 @@
       if (fresh) {
         box.appendChild(el('p', {
           style: 'margin:0 0 8px',
-          text: 'Найден несохранённый черновик' + draftWhen(draft) + ': ' + changes.length + ' ' +
-            ECO.plural(changes.length, ['отличие', 'отличия', 'отличий']) +
+          text: 'Найден несохранённый черновик' + draftWhen(draft) + ': ' + (changes.length + patronChanges.length) + ' ' +
+            ECO.plural(changes.length + patronChanges.length, ['отличие', 'отличия', 'отличий']) +
             ' от data/trees.js. Пока вы не решите, новые правки в черновик не записываются.'
         }));
         box.appendChild(draftButtons(box, el('button', {
@@ -518,7 +600,8 @@
             var ch = draftPending;
             draftPending = null;
             box.hidden = true;
-            apply('Восстановлен черновик', ch);
+            if (ch.length) apply('Восстановлен черновик', ch);
+            if (ch.patrons.length) applyPatron('Восстановлено шефство из черновика', ch.patrons);
           }
         })));
       } else {
@@ -585,6 +668,38 @@
       });
     });
     $('btn-undo').addEventListener('click', undo);
+
+    // ---------- шефство: выбранное дерево / вся группа (порода+год) / диапазон номеров группы ----------
+    function patronTargets() {
+      var scope = $('patron-scope').value;
+      if (scope === 'selected') return selTree.value === AUTO ? [] : [selTree.value];
+      var group = groupTrees().map(function (t) { return t.id; });
+      if (scope === 'group') return group;
+      var from = $('patron-from').value.trim().toUpperCase();
+      var to = $('patron-to').value.trim().toUpperCase();
+      if (!ECO.ID_RE.test(from) || !ECO.ID_RE.test(to)) return null;
+      if (from > to) { var x = from; from = to; to = x; }
+      return group.filter(function (id) { return id >= from && id <= to && id.split('-')[0] === from.split('-')[0]; });
+    }
+    function updatePatronScope() { $('patron-range').hidden = $('patron-scope').value !== 'range'; }
+    $('patron-scope').addEventListener('change', updatePatronScope);
+    updatePatronScope();
+    $('btn-patron-set').addEventListener('click', function () {
+      var name = $('patron-name').value.replace(/\s+/g, ' ').trim();
+      if (!name || name.length > ECO.PATRON_MAX) { say('Укажите шефа: класс или группу (до 80 знаков, без имён и фамилий).', true); return; }
+      var since = $('patron-since').value || null;
+      if (since && !ECO.parseDate(since)) { say('Дата начала шефства некорректна.', true); return; }
+      var targets = patronTargets();
+      if (targets === null) { say('Укажите номера «с» и «по» в формате L-001.', true); return; }
+      if (!targets.length) { say('Не выбрано ни одного дерева для шефства.', true); return; }
+      applyPatron('Назначен шеф «' + name + '»', targets.map(function (id) { return { id: id, after: [name, since] }; }));
+    });
+    $('btn-patron-clear').addEventListener('click', function () {
+      var targets = patronTargets();
+      if (targets === null) { say('Укажите номера «с» и «по» в формате L-001.', true); return; }
+      if (!targets.length) { say('Не выбрано ни одного дерева.', true); return; }
+      applyPatron('Снят шеф', targets.map(function (id) { return { id: id, after: null }; }));
+    });
     $('btn-cancel-row').addEventListener('click', function () {
       clearRowStart();
       say(nextHint());
@@ -616,7 +731,7 @@
     say(nextHint());
     checkDraft();
 
-    window.ECO_EDITOR = { map: map, records: records, buildTreesJs: buildTreesJs, baseFingerprint: BASE_FP, draftKey: DRAFT_KEY }; // для автоматических проверок
+    window.ECO_EDITOR = { map: map, records: records, byId: byId, buildTreesJs: buildTreesJs, baseFingerprint: BASE_FP, draftKey: DRAFT_KEY }; // для автоматических проверок
     window.ECO_PAGE_DONE = true;
   }
 

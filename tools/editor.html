@@ -54,6 +54,30 @@
       <button type="button" class="btn" id="btn-remove" disabled>Снять точку выбранного дерева</button>
     </div>
 
+    <details class="editor-export" id="patron-box">
+      <summary>Шефство (класс или группа опекает деревья)</summary>
+      <label for="patron-name">Шеф — класс или группа (без имён и фамилий)</label>
+      <input type="text" id="patron-name" maxlength="80" autocomplete="off" placeholder="например, 7 «Б» класс, школа-гимназия №…">
+      <label for="patron-since">С какого числа (необязательно)</label>
+      <input type="date" id="patron-since">
+      <label for="patron-scope">Каким деревьям</label>
+      <select id="patron-scope">
+        <option value="selected">Выбранному дереву</option>
+        <option value="group">Всем деревьям выбранной породы и года</option>
+        <option value="range">Ряду номеров выбранной породы (с … по …)</option>
+      </select>
+      <div id="patron-range" hidden>
+        <label for="patron-from">С номера</label>
+        <input type="text" id="patron-from" maxlength="6" autocomplete="off" placeholder="L-001">
+        <label for="patron-to">По номер</label>
+        <input type="text" id="patron-to" maxlength="6" autocomplete="off" placeholder="L-010">
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btn-patron-set">Назначить шефа</button>
+        <button type="button" class="btn btn--outline" id="btn-patron-clear">Снять шефа</button>
+      </div>
+    </details>
+
     <details class="editor-export" id="export-box" open>
       <summary>Сохранить data/trees.js</summary>
       <p class="note">Перед заменой файла сохраните копию прошлого <b>data/trees.js</b>
