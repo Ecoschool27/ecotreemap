@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:,">
+<title>Полевой режим — EcoTreeMap</title>
+<link rel="stylesheet" href="../assets/lib/leaflet/leaflet.css">
+<link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body class="page-field">
+<header class="site-header">
+  <div>
+    <h1>Полевой режим</h1>
+    <p class="sub">Отметить дерево с телефона: место по GPS, состояние, фото, QR-табличка</p>
+  </div>
+  <nav aria-label="Разделы сайта">
+    <a href="editor.html">Редактор</a>
+    <a href="../index.html">Карта сайта</a>
+  </nav>
+</header>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<main class="page field-page">
+  <div id="pending-banner" class="note field-banner" role="status" hidden></div>
+  <div id="secure-banner" class="note field-banner" role="note" hidden></div>
+  <div id="qr-banner" class="note field-banner" role="note" hidden></div>
+
+  <section class="card">
+    <h2>1. Что делаем</h2>
+    <fieldset>
+      <legend>Действие</legend>
+      <label class="check"><input type="radio" name="kind" value="place_existing" checked> Отметить место уже посаженного дерева</label>
+      <label class="check"><input type="radio" name="kind" value="new_tree"> Новое дерево (новый номер)</label>
+      <label class="check"><input type="radio" name="kind" value="inspect"> Осмотр отмеченного дерева</label>
+    </fieldset>
+
+    <div id="box-species">
+      <label for="f-species">Порода</label>
+      <select id="f-species"></select>
+    </div>
+    <div id="box-existing">
+      <label for="f-existing">Номер дерева (только ещё не отмеченные)</label>
+      <select id="f-existing"></select>
+    </div>
+    <div id="box-new" hidden>
+      <p class="summary-line" id="f-new-id" aria-live="polite"></p>
+      <label for="f-year">Год посадки (обязательно)</label>
+      <input type="number" id="f-year" min="1900" step="1" inputmode="numeric">
+      <label for="f-date">Дата посадки (если известна)</label>
+      <input type="date" id="f-date">
+    </div>
+    <div id="box-inspect" hidden>
+      <p class="muted" id="nearest-hint">Ближайшие отмеченные деревья появятся после включения GPS.</p>
+      <div id="nearest-list" class="btn-row"></div>
+      <label for="f-inspect-id">Номер дерева (с таблички)</label>
+      <input type="text" id="f-inspect-id" maxlength="6" autocomplete="off" placeholder="например, L-001">
+    </div>
+    <p class="muted" id="tree-facts" aria-live="polite"></p>
+  </section>
+
+  <section class="card" id="box-location">
+    <h2>2. Место</h2>
+    <p class="muted">GPS телефона обычно точен до 3–10 м, под деревьями и у зданий — хуже. Проверьте точку на карте
+      и при необходимости перетащите её пальцем.</p>
+    <div class="btn-row">
+      <button type="button" class="btn btn--primary" id="gps-start">Включить GPS</button>
+      <button type="button" class="btn" id="gps-fix" disabled>Зафиксировать</button>
+      <button type="button" class="btn btn--outline" id="gps-force" disabled>Зафиксировать всё равно</button>
+    </div>
+    <p id="gps-status" class="editor-hint" role="status" aria-live="polite">GPS выключен. Можно поставить точку вручную — нажмите на карту.</p>
+    <div id="field-map" class="field-map" role="region" aria-label="Карта: место дерева"></div>
+    <p id="coord-line" class="muted" aria-live="polite">Точка не поставлена.</p>
+  </section>
+
+  <section class="card">
+    <h2>3. Состояние и фото</h2>
+    <label for="f-status">Состояние</label>
+    <select id="f-status"></select>
+    <div id="box-event">
+      <label for="f-event">Акция</label>
+      <select id="f-event"></select>
+      <div id="box-event-custom" hidden>
+        <label for="f-event-custom">Название акции (до 120 знаков)</label>
+        <input type="text" id="f-event-custom" maxlength="120">
+      </div>
+    </div>
+    <label for="f-observed">Дата осмотра</label>
+    <input type="date" id="f-observed">
+    <label for="f-notes">Заметка (до 500 знаков) — <b>будет видна всем на сайте</b></label>
+    <textarea id="f-notes" rows="3" maxlength="500"></textarea>
+    <label for="f-author">Кто отметил (до 60 знаков) — на сайте не публикуется</label>
+    <input type="text" id="f-author" maxlength="60" autocomplete="name">
+    <div id="photo-warning" class="note" role="alert" hidden>
+      <p style="margin:0 0 8px"><b>Снимайте только дерево</b> — без лиц людей и номеров машин. Фото будет опубликовано на сайте.</p>
+      <button type="button" class="btn btn--primary" id="photo-warning-ok">Понятно</button>
+    </div>
+    <label for="f-photo">Фото дерева</label>
+    <input type="file" id="f-photo" accept="image/*" capture="environment">
+    <p id="photo-status" class="muted" aria-live="polite"></p>
+    <img id="photo-preview" class="field-photo-preview" alt="Предпросмотр фото дерева" hidden>
+  </section>
+
+  <section class="card">
+    <button type="button" class="btn btn--primary btn--block" id="btn-save">Сохранить запись на телефоне</button>
+    <div id="save-result" class="result" role="status" hidden></div>
+  </section>
+
+  <section class="card" id="plaque-card" hidden>
+    <h2>QR-табличка</h2>
+    <div id="plaque" class="plaque">
+      <img id="plaque-qr" alt="QR-код паспорта дерева">
+      <p class="plaque__id" id="plaque-id"></p>
+      <p class="plaque__species" id="plaque-species"></p>
+      <p class="plaque__hint">Наведите камеру телефона</p>
+    </div>
+    <div class="btn-row no-print">
+      <button type="button" class="btn btn--primary" id="btn-print">Печать таблички</button>
+      <button type="button" class="btn btn--outline" id="btn-png">Скачать PNG</button>
+    </div>
+    <p class="muted no-print" id="plaque-url"></p>
+  </section>
+
+  <section class="card">
+    <h2>4. Выгрузка</h2>
+    <p class="muted">Записи и фото хранятся только в этом браузере. Выгрузите файл и передайте координатору —
+      он вольёт его в сайт скриптом tools/merge_field.py. Пока вкладка открыта, интернет не нужен (кроме подложки карты).</p>
+    <div class="btn-row">
+      <button type="button" class="btn btn--primary" id="btn-export">Выгрузить новые</button>
+      <button type="button" class="btn btn--outline" id="btn-export-all">Выгрузить всё</button>
+    </div>
+    <div id="export-confirm" class="note" role="alertdialog" aria-labelledby="export-confirm-text" hidden>
+      <p id="export-confirm-text" style="margin:0 0 8px"></p>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="export-saved">Файл сохранён</button>
+        <button type="button" class="btn btn--outline" id="export-not-saved">Не сохранился</button>
+      </div>
+    </div>
+    <p id="export-status" role="status" aria-live="polite"></p>
+    <h3>Записи на этом телефоне</h3>
+    <ul id="records-list" class="field-records"></ul>
+  </section>
+</main>
+<noscript><p class="fatal">Для полевого режима нужен JavaScript.</p></noscript>
+
+<script src="../assets/js/config.js"></script>
+<script src="../data/species.js"></script>
+<script src="../data/trees.js"></script>
+<script src="../assets/lib/leaflet/leaflet.js"></script>
+<script src="../assets/lib/qrcode-generator/qrcode.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/field-store.js"></script>
+<script src="../assets/js/field.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    if (window.ECO_PAGE_DONE || window.ECO_FIELD) return; // ECO_FIELD ставится сразу, хранилище браузера открывается позже
+    var box = document.getElementById('fatal');
+    box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Откройте полевой режим из полной копии сайта.';
+    box.hidden = false;
+  });
+</script>
+</body>
+</html>

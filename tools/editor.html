@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<meta name="robots" content="noindex, nofollow">
+<title>Редактор мест посадки — EcoTreeMap</title>
+<link rel="stylesheet" href="../assets/lib/leaflet/leaflet.css">
+<link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body class="page-map page-editor">
+<header class="site-header">
+  <div>
+    <h1>Редактор мест посадки</h1>
+    <p class="sub">Отметить деревья на карте и сохранить data/trees.js</p>
+  </div>
+  <nav aria-label="Разделы сайта">
+    <a href="field.html">Полевой режим</a>
+    <a href="../index.html">Карта сайта</a>
+  </nav>
+</header>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<div class="map-layout">
+  <aside class="panel" aria-label="Управление редактором">
+    <div id="draft-box" class="note" hidden></div>
+    <p class="summary-line" id="progress" aria-live="polite"></p>
+
+    <fieldset>
+      <legend>Режим</legend>
+      <div class="mode-switch">
+        <label class="check"><input type="radio" name="mode" value="point" checked> Точка</label>
+        <label class="check"><input type="radio" name="mode" value="row"> Ряд (аллея)</label>
+      </div>
+    </fieldset>
+
+    <label for="sel-species">Порода</label>
+    <select id="sel-species"></select>
+    <label for="sel-year">Год посадки</label>
+    <select id="sel-year"></select>
+    <label for="sel-tree">Дерево</label>
+    <select id="sel-tree"></select>
+
+    <div id="row-options" hidden>
+      <label for="row-n">Сколько деревьев в ряду</label>
+      <input type="number" id="row-n" min="1" step="1" value="10" inputmode="numeric">
+    </div>
+
+    <p id="hint" class="editor-hint" role="status" aria-live="polite"></p>
+
+    <div class="btn-row">
+      <button type="button" class="btn" id="btn-undo" disabled>Отменить последнее (Ctrl+Z)</button>
+      <button type="button" class="btn" id="btn-cancel-row" hidden>Сбросить начало ряда (Esc)</button>
+      <button type="button" class="btn" id="btn-remove" disabled>Снять точку выбранного дерева</button>
+    </div>
+
+    <details class="editor-export" id="export-box" open>
+      <summary>Сохранить data/trees.js</summary>
+      <p class="note">Перед заменой файла сохраните копию прошлого <b>data/trees.js</b>
+        (например, переименуйте в trees_ГГГГ-ММ-ДД.js). Новый файл положите в папку data/ вместо старого
+        и обновите страницу карты.</p>
+      <div class="btn-row">
+        <button type="button" class="btn btn--primary" id="btn-download">Скачать trees.js</button>
+        <button type="button" class="btn btn--outline" id="btn-copy">Скопировать текст</button>
+      </div>
+      <p id="export-status" role="status" aria-live="polite"></p>
+      <label for="export-text">Текст файла (обновляется после каждой правки)</label>
+      <textarea id="export-text" readonly spellcheck="false"></textarea>
+    </details>
+
+    <details>
+      <summary>Как пользоваться</summary>
+      <ul>
+        <li><b>Точка:</b> выберите породу (и год) — клик по карте ставит следующее неотмеченное дерево.
+          Чтобы переставить конкретное дерево, выберите его в списке «Дерево» и кликните в новое место
+          или перетащите точку мышью.</li>
+        <li><b>Ряд:</b> укажите число деревьев, кликните в начало ряда, потом в конец — точки
+          расставятся равномерно и получат следующие неотмеченные номера выбранной породы.</li>
+        <li>Работа автоматически сохраняется в этом браузере как черновик, но в файл сайта попадает
+          только после «Скачать trees.js» и замены файла.</li>
+        <li>Подложка — OpenStreetMap, нужен интернет. Других внешних сервисов редактор не использует.</li>
+      </ul>
+    </details>
+  </aside>
+  <main class="map-wrap">
+    <div id="map" role="region" aria-label="Карта для отметки деревьев"></div>
+    <div id="map-notice" class="map-notice" role="status" hidden></div>
+  </main>
+</div>
+<noscript><p class="fatal">Для редактора нужен JavaScript.</p></noscript>
+
+<script src="../assets/js/config.js"></script>
+<script src="../data/species.js"></script>
+<script src="../data/trees.js"></script>
+<script src="../assets/lib/leaflet/leaflet.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/editor.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    if (window.ECO_PAGE_DONE) return;
+    var box = document.getElementById('fatal');
+    box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Откройте редактор из полной копии сайта.';
+    box.hidden = false;
+  });
+</script>
+</body>
+</html>

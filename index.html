@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Карта посаженных деревьев — EcoTreeMap</title>
+<link rel="stylesheet" href="assets/lib/leaflet/leaflet.css">
+<link rel="stylesheet" href="assets/lib/markercluster/MarkerCluster.css">
+<link rel="stylesheet" href="assets/lib/markercluster/MarkerCluster.Default.css">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body class="page-map">
+<header class="site-header">
+  <div>
+    <h1>Карта посаженных деревьев</h1>
+    <p class="sub">Караганда, этнопарк · рядом стела «Сүйінші»</p>
+  </div>
+  <nav aria-label="Разделы сайта">
+    <a href="pages/species.html">Породы</a>
+    <a href="pages/credits.html">Источники</a>
+  </nav>
+</header>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<div class="map-layout">
+  <aside class="panel" id="panel" aria-label="Легенда, фильтр и список деревьев">
+    <p class="summary-line" id="summary" aria-live="polite"></p>
+    <details id="filters" open>
+      <summary>Легенда и фильтр</summary>
+      <form id="filter-form" onsubmit="return false">
+        <fieldset id="species-filter"><legend>Порода (цвет точки)</legend></fieldset>
+        <fieldset id="year-filter"><legend>Год посадки</legend></fieldset>
+      </form>
+    </details>
+    <details id="unplaced">
+      <summary id="unplaced-summary">Место не отмечено</summary>
+      <div id="unplaced-list"></div>
+    </details>
+  </aside>
+  <main class="map-wrap">
+    <div id="map" role="region" aria-label="Карта деревьев"></div>
+    <div id="map-notice" class="map-notice" role="status" hidden></div>
+  </main>
+</div>
+<noscript><p class="fatal">Для карты нужен JavaScript. Включите его в браузере.</p></noscript>
+
+<script src="assets/js/config.js"></script>
+<script src="data/species.js"></script>
+<script src="data/trees.js"></script>
+<script src="assets/lib/leaflet/leaflet.js"></script>
+<script src="assets/lib/markercluster/leaflet.markercluster.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/map.js"></script>
+<script>
+  // Страховка: если скрипты сайта не загрузились (сайт опубликован не полностью), показать причину.
+  window.addEventListener('load', function () {
+    if (window.ECO_PAGE_DONE) return;
+    var box = document.getElementById('fatal');
+    box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
+    box.hidden = false;
+  });
+</script>
+</body>
+</html>

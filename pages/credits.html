@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Источники и лицензии — EcoTreeMap</title>
+<link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <h1>Источники и лицензии</h1>
+    <p class="sub">Карта, программы, фотографии</p>
+  </div>
+  <nav aria-label="Разделы сайта">
+    <a href="../index.html">Карта</a>
+    <a href="species.html">Породы</a>
+  </nav>
+</header>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<main class="page">
+  <section class="card">
+    <h2>Картографическая подложка</h2>
+    <p>Карта: &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">участники OpenStreetMap</a>.
+      Данные OpenStreetMap доступны по лицензии Open Database License (ODbL).</p>
+    <p class="muted">Тайлы загружаются с сервера tile.openstreetmap.org — нужен интернет.</p>
+  </section>
+  <section class="card">
+    <h2>Программные библиотеки</h2>
+    <div id="libs"></div>
+    <p class="muted">Копии библиотек хранятся в папке assets/lib, происхождение и контрольные суммы —
+      в <a href="../assets/lib/VERSIONS.txt">assets/lib/VERSIONS.txt</a>.</p>
+  </section>
+  <section class="card">
+    <h2>Фотографии</h2>
+    <div id="photos"></div>
+  </section>
+  <p class="back-links"><a class="btn btn--outline" href="../index.html">← К карте</a></p>
+</main>
+
+<script src="../images/sources.js"></script>
+<script src="../assets/lib/libs.js"></script>
+<script src="../assets/js/common.js"></script>
+<script>
+  (function () {
+    'use strict';
+    var ECO = window.ECO;
+    if (!ECO) return;
+    var el = ECO.el;
+    var box = document.getElementById('photos');
+    var list = Array.isArray(window.ECO_IMAGE_SOURCES) ? window.ECO_IMAGE_SOURCES : null;
+    if (!list) {
+      box.appendChild(el('p', { className: 'muted', text: 'Не загрузился файл images/sources.js.' }));
+    } else if (!list.length) {
+      box.appendChild(el('p', { className: 'muted', text: 'Фотографий пока нет — они будут добавлены с указанием авторов и лицензий.' }));
+    } else {
+      var ul = el('ul', { className: 'credits-list' });
+      list.forEach(function (s) {
+        if (!s || !s.file) return;
+        var licenseUrl = ECO.safeUrl(s.license_url);
+        var sourceUrl = ECO.safeUrl(s.source_page);
+        ul.appendChild(el('li', null, [
+          el('b', { text: String(s.file) }),
+          ' — автор: ' + (s.author ? String(s.author) : 'не указан') + '; лицензия: ',
+          licenseUrl
+            ? el('a', { href: licenseUrl, text: s.license ? String(s.license) : licenseUrl, attrs: { target: '_blank', rel: 'noopener' } })
+            : (s.license ? String(s.license) : 'не указана'),
+          sourceUrl ? '; ' : '',
+          sourceUrl ? el('a', { href: sourceUrl, text: 'источник', attrs: { target: '_blank', rel: 'noopener' } }) : '',
+          s.modified ? '; изменено: ' + String(s.modified) : '',
+          s.note ? ' (' + String(s.note) + ')' : ''
+        ]));
+      });
+      box.appendChild(ul);
+    }
+    // библиотеки — из единого перечня assets/lib/libs.js
+    var libsBox = document.getElementById('libs');
+    var libs = Array.isArray(window.ECO_LIBS) ? window.ECO_LIBS : null;
+    if (!libs) {
+      libsBox.appendChild(el('p', { className: 'muted', text: 'Не загрузился файл assets/lib/libs.js — перечень библиотек см. в assets/lib/VERSIONS.txt.' }));
+    } else {
+      var lul = el('ul', { className: 'credits-list', attrs: { id: 'libs-list' } });
+      libs.forEach(function (b) {
+        if (!b || !b.name) return;
+        var home = ECO.safeUrl(b.homepage);
+        var lic = typeof b.license_url === 'string' && /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(b.license_url) ? '../assets/lib/' + b.license_url : null;
+        lul.appendChild(el('li', { attrs: { 'data-lib': String(b.dir || '') } }, [
+          home ? el('a', { href: home, text: String(b.name), attrs: { target: '_blank', rel: 'noopener' } }) : String(b.name),
+          ' ' + String(b.version || '') + ' — лицензия ' + String(b.license || 'не указана') +
+            (b.copyright ? ', ' + String(b.copyright) : '') + (b.purpose ? '; ' + String(b.purpose) : ''),
+          lic ? ' (' : '',
+          lic ? el('a', { href: lic, text: 'текст лицензии' }) : '',
+          lic ? ').' : '.'
+        ]));
+      });
+      libsBox.appendChild(lul);
+    }
+    window.ECO_PAGE_DONE = true;
+  })();
+  window.addEventListener('load', function () {
+    if (window.ECO_PAGE_DONE) return;
+    var box = document.getElementById('fatal');
+    box.textContent = 'Не удалось загрузить файлы сайта (папка assets/). Список фотографий недоступен; остальные сведения на странице актуальны.';
+    box.hidden = false;
+  });
+</script>
+</body>
+</html>

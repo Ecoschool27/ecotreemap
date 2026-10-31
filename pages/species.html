@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Породы деревьев — EcoTreeMap</title>
+<link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <h1>Породы деревьев</h1>
+    <p class="sub">Что посажено в проекте</p>
+  </div>
+  <nav aria-label="Разделы сайта">
+    <a href="../index.html">Карта</a>
+    <a href="credits.html">Источники</a>
+  </nav>
+</header>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<main class="page" id="content"></main>
+<noscript><p class="fatal">Для справочника пород нужен JavaScript. Включите его в браузере.</p></noscript>
+
+<script src="../assets/js/config.js"></script>
+<script src="../data/species.js"></script>
+<script src="../data/trees.js"></script>
+<script src="../images/sources.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/species-page.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    if (window.ECO_PAGE_DONE) return;
+    var box = document.getElementById('fatal');
+    box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
+    box.hidden = false;
+  });
+</script>
+</body>
+</html>

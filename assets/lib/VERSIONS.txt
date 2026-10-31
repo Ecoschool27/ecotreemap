@@ -1,0 +1,29 @@
+Локальные копии библиотек карты (сайт работает с флешки, file://, без CDN).
+
+Источник — официальные npm-пакеты, целостность архивов сверена с метаданными реестра npm
+(поле dist.integrity), хэши leaflet.js/leaflet.css дополнительно сверены с SRI на странице
+https://leafletjs.com/download.html. Дата сверки: 2026-11-01.
+
+leaflet 1.9.4 (BSD-2-Clause, (c) Volodymyr Agafonkin, CloudMade) — https://leafletjs.com
+  архив:     https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz
+  integrity: sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==
+  leaflet.js  sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=  (совпадает с leafletjs.com)
+  leaflet.css sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=  (совпадает с leafletjs.com)
+
+leaflet.markercluster 1.5.3 (MIT, (c) Dave Leaver) — https://github.com/Leaflet/Leaflet.markercluster
+  архив:     https://registry.npmjs.org/leaflet.markercluster/-/leaflet.markercluster-1.5.3.tgz
+  integrity: sha512-vPTw/Bndq7eQHjLBVlWpnGeLa3t+3zGiuM7fJwCkiMFq+nmRuG3RI3f7f4N4TDX7T4NpbAXpR2+NTRSEGfCSeA==
+  leaflet.markercluster.js  sha256-Hk4dIpcqOSb0hZjgyvFOP+cEmDXUKKNE/tT542ZbNQg=
+  MarkerCluster.css         sha256-YU3qCpj/P06tdPBJGPax0bm6Q1wltfwjsho5TR4+TYc=
+  MarkerCluster.Default.css sha256-YSWCMtmNZNwqex4CEw1nQhvFub2lmU7vcCKP+XVwwXA=
+
+qrcode-generator 2.0.4 (MIT, (c) 2009 Kazuhiko Arase) — https://github.com/kazuhikoarase/qrcode-generator
+  Используется полевым режимом (tools/field.html) для QR-табличек прямо в браузере.
+  архив:     https://registry.npmjs.org/qrcode-generator/-/qrcode-generator-2.0.4.tgz
+  integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==
+  qrcode.js (из dist/qrcode.js)  sha256-eeyG+ChWAFsciHkFz8z8++w4Icphx/1alS+qX3ePeRw=
+  LICENSE.txt — стандартный текст MIT (в пакете отдельного файла лицензии нет; MIT указана в package.json
+  и в заголовке qrcode.js). Дата сверки: 2026-11-01.
+
+Подложка карты (тайлы) грузится из интернета: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+Без интернета точки, легенда и паспорта работают, подложка — нет (страница об этом сообщает).
