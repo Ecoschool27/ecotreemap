@@ -5,6 +5,8 @@
   if (!ECO) return;
   var el = ECO.el;
 
+  var WATER_KEY_PREFIX = 'ecotreemap_watered_';
+
   function notFound(title, text) {
     var content = document.getElementById('content');
     ECO.clear(content);
@@ -23,6 +25,14 @@
   function fact(dl, label, value) {
     dl.appendChild(el('dt', { text: label }));
     dl.appendChild(typeof value === 'string' ? el('dd', { text: value }) : el('dd', null, [value]));
+  }
+
+  function formatWaterDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    var days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    var when = days <= 0 ? 'сегодня' : days === 1 ? 'вчера' : days + ' ' + ECO.plural(days, ['день', 'дня', 'дней']) + ' назад';
+    return when + ' (' + d.toLocaleDateString('ru-RU') + ')';
   }
 
   function main() {
@@ -60,20 +70,6 @@
     fact(dl, 'Акция', tree.event ? String(tree.event) : 'уточняется');
     var statusDate = tree.status ? ECO.formatDate(tree.status_date) : null;
     fact(dl, 'Состояние', ECO.statusLabel(tree.status) + (statusDate ? ' (осмотр ' + statusDate + ')' : ''));
-    var lastWater = ECO.lastWatered(tree);
-    fact(dl, 'Последний полив', lastWater ? ECO.formatDate(lastWater) : 'Полив ещё не отмечен');
-    var email = ECO.contactEmail();
-    var patron = ECO.patronOf(tree);
-    if (patron) {
-      var since = ECO.formatDate(tree.patron_since);
-      fact(dl, 'Шефство', 'Под опекой: ' + patron + (since ? ' (с ' + since + ')' : ''));
-    } else {
-      fact(dl, 'Шефство', el('span', null, [
-        'Ищет опекуна — ',
-        email ? el('a', { href: 'mailto:' + email + '?subject=' + encodeURIComponent('Шефство над деревом ' + tree.id),
-          text: 'напишите координатору' }) : 'напишите координатору'
-      ]));
-    }
     if (ECO.hasCoords(tree)) {
       // точность — только для точек по GPS; gps-low (зафиксировано при плохом сигнале) помечается «приблизительно»
       var gpsLike = tree.coord_source === 'gps' || tree.coord_source === 'gps-low';
@@ -101,44 +97,12 @@
     if (tree.notes) main.appendChild(el('p', { className: 'note', text: String(tree.notes) }));
     content.appendChild(main);
 
-    // ----- фото: своё фото дерева приоритетнее фото породы; при 2+ фото — «было → стало» и лента по датам -----
-    var history = ECO.photoHistory(tree);
-    var cfg = window.ECO_CONFIG || {};
-    var credit = typeof cfg.TREE_PHOTO_CREDIT === 'string' && cfg.TREE_PHOTO_CREDIT.trim()
-      ? cfg.TREE_PHOTO_CREDIT.trim() : 'Фото: участники проекта EcoTreeMap';
-    function histFigure(h, label) {
-      var date = ECO.formatDate(h.date);
-      var img = el('img', { attrs: { src: '../images/' + h.path, alt: 'Дерево ' + tree.id + (date ? ', ' + date : ''), loading: 'lazy' } });
-      var fig = el('figure', { className: 'photo photo--tree', style: 'margin:0' }, [
-        img,
-        el('figcaption', { className: 'photo-credit', text: (label ? label + ': ' : '') + (date || 'дата не указана') +
-          (h.status ? ' — ' + ECO.statusLabel(h.status) : '') })
-      ]);
-      img.addEventListener('error', function () { if (fig.parentNode) fig.parentNode.removeChild(fig); });
-      return fig;
-    }
-    var photoCard;
-    if (history.length >= 2) {
-      var first = history[history.length - 1];
-      var last = history[0];
-      var strip = el('div', { className: 'photo-strip', attrs: { role: 'list', 'aria-label': 'Все фото дерева по датам, новые первыми' } });
-      history.forEach(function (h) { strip.appendChild(el('div', { attrs: { role: 'listitem' } }, [histFigure(h)])); });
-      photoCard = el('section', { className: 'card' }, [
-        el('h2', { text: 'Фото дерева' }),
-        el('h3', { text: 'Было → стало' }),
-        el('div', { className: 'before-after' }, [histFigure(first, 'Было'), histFigure(last, 'Стало')]),
-        el('h3', { text: 'Все фото по датам (' + history.length + ')' }),
-        strip,
-        el('p', { className: 'photo-credit', text: credit })
-      ]);
-    } else {
-      var treePhoto = ECO.treePhotoBlock(tree, sp, '../images/');
-      photoCard = el('section', { className: 'card' }, [
-        el('h2', { text: treePhoto ? 'Фото дерева' : 'Фото' }),
-        treePhoto || ECO.photoBlock(sp, '../images/')
-      ]);
-    }
-    content.appendChild(photoCard);
+    // ----- фото: своё фото дерева приоритетнее фото породы -----
+    var treePhoto = ECO.treePhotoBlock(tree, sp, '../images/');
+    content.appendChild(el('section', { className: 'card' }, [
+      el('h2', { text: treePhoto ? 'Фото дерева' : 'Фото' }),
+      treePhoto || ECO.photoBlock(sp, '../images/')
+    ]));
 
     // ----- история осмотров (до 10, новые сверху) -----
     var obs = Array.isArray(tree.observations) ? tree.observations.filter(function (o) {
@@ -149,9 +113,7 @@
       var ol = el('ul', { className: 'tree-observations' });
       obs.slice(0, 10).forEach(function (o) {
         var parts = [ECO.formatDate(o.date) + ': '];
-        parts.push(o.status ? ECO.statusLabel(o.status) : o.watered === true ? '' : 'состояние не указано');
-        if (o.watered === true) parts.push((o.status ? '; ' : '') + 'полито');
-        if (ECO.obsPhotoPath(tree, o)) parts.push('; фото');
+        parts.push(o.status ? ECO.statusLabel(o.status) : 'состояние не указано');
         if (o.notes) parts.push(' — ' + String(o.notes).slice(0, 500));
         ol.appendChild(el('li', { text: parts.join('') }));
       });
@@ -172,18 +134,47 @@
     }
     content.appendChild(careCard);
 
-    // ----- полив: отметка — запись осмотра в полевом режиме, видна всем после добавления координатором -----
-    content.appendChild(el('section', { className: 'card', attrs: { id: 'water' } }, [
+    // ----- полив -----
+    var email = ECO.contactEmail();
+    var waterStatus = el('p', { attrs: { 'aria-live': 'polite' } });
+    var waterResult = el('div', { className: 'result', attrs: { role: 'status' }, hidden: true });
+    function renderWater() {
+      var last = ECO.storageGet(WATER_KEY_PREFIX + tree.id);
+      var text = last && formatWaterDate(last);
+      waterStatus.textContent = text
+        ? 'На этом устройстве последняя отметка полива: ' + text + '.'
+        : 'На этом устройстве отметок полива этого дерева нет.';
+    }
+    var waterBtn = el('button', {
+      type: 'button',
+      className: 'btn btn--water btn--block',
+      text: 'Я полил(а) это дерево сегодня',
+      onclick: function () {
+        var saved = ECO.storageSet(WATER_KEY_PREFIX + tree.id, new Date().toISOString());
+        renderWater();
+        var msg = saved ? 'Отметка сохранена на этом устройстве. ' : 'Браузер не разрешил сохранить отметку на устройстве. ';
+        if (email) {
+          ECO.openMail(
+            'Паспорт дерева: полив ' + tree.id,
+            'Дерево ' + tree.id + ' (' + sp.name_ru + ') полито ' + new Date().toLocaleString('ru-RU') + '.\n\nОтправлено со страницы паспорта дерева.'
+          );
+          waterResult.className = 'result';
+          waterResult.textContent = msg + 'Открываем почтовую программу — отправьте письмо координатору. Спасибо!';
+        } else {
+          waterResult.className = 'result result--demo';
+          waterResult.textContent = msg + 'Демо: адрес координатора не задан, поэтому координатору ничего не отправлено.';
+        }
+        waterResult.hidden = false;
+      }
+    });
+    content.appendChild(el('section', { className: 'card' }, [
       el('h2', { text: 'Полив' }),
-      el('p', { text: lastWater ? 'Последний полив: ' + ECO.formatDate(lastWater) : 'Полив ещё не отмечен.' }),
-      el('a', {
-        href: '../tools/field.html?id=' + encodeURIComponent(tree.id) + '&action=water',
-        className: 'btn btn--water btn--block',
-        text: 'Полил(а) это дерево'
-      }),
-      el('p', { className: 'muted', text: 'Кнопка открывает полевой режим для этого дерева. Отметка появится на сайте ' +
-        'после выгрузки и добавления координатором.' })
+      el('p', { className: 'muted', text: 'Отметки полива хранятся только на этом устройстве (в браузере) — другие люди их не видят.' }),
+      waterBtn,
+      waterStatus,
+      waterResult
     ]));
+    renderWater();
 
     // ----- сообщить о проблеме -----
     var typeSelect = el('select', { attrs: { id: 'problem-type', name: 'problem-type' } },
@@ -226,9 +217,6 @@
       email ? null : el('p', { className: 'note', text: 'Демо-режим: адрес координатора пока не задан, письма не отправляются.' }),
       form
     ]));
-
-    // ----- поделиться -----
-    if (ECO.shareSection) content.appendChild(ECO.shareSection(tree, sp));
 
     // ----- QR-код -----
     var qrBox = el('div', { className: 'qr' });

@@ -636,30 +636,3 @@ legend {
     max-width: 12cm;
   }
 }
-
-/* ---------- v4: справочник, шефство, «нужна помощь», статистика, фото-история, поделиться ---------- */
-.species-noimg {
-  height: 72px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  padding-left: 20px;
-  margin-bottom: 12px;
-}
-.species-noimg span { color: #ffffff; font-size: 2rem; font-weight: 700; }
-.species-note { margin: 8px 0; }
-.species-filter input, .species-filter select { width: 100%; max-width: 100%; }
-.legend-note { margin: 2px 0 6px; font-size: 0.9rem; color: var(--muted); }
-.dot--ring { border: 2px solid #1b5e20; box-sizing: border-box; }
-.before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.before-after img, .photo-strip img { width: 100%; height: auto; display: block; border-radius: 6px; }
-.photo-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-.share-preview { width: 100%; max-width: 360px; height: auto; display: block; margin: 12px 0; border-radius: 8px; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
-.stat { background: var(--green-bg); border-radius: 8px; padding: 10px 12px; }
-.stat b { display: block; font-size: 1.8rem; color: var(--green-dark); }
-.chart { width: 100%; max-width: 640px; height: auto; display: block; }
-.chart-legend { list-style: none; padding: 0; margin: 8px 0 0; }
-.chart-legend li { margin: 4px 0; }
-.lang-switch { margin-left: 8px; }
-@media (max-width: 420px) { .before-after { grid-template-columns: 1fr; } }

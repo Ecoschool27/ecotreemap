@@ -18,7 +18,6 @@
   </div>
   <nav aria-label="Разделы сайта">
     <a href="pages/species.html">Породы</a>
-    <a href="pages/stats.html">Статистика</a>
     <a href="pages/credits.html">Источники</a>
   </nav>
 </header>
@@ -31,14 +30,6 @@
       <form id="filter-form" onsubmit="return false">
         <fieldset id="species-filter"><legend>Порода (цвет точки)</legend></fieldset>
         <fieldset id="year-filter"><legend>Год посадки</legend></fieldset>
-        <fieldset id="patron-filter"><legend>Шефство</legend></fieldset>
-        <fieldset id="help-filter"><legend>Нужна помощь</legend>
-          <label class="check"><input type="checkbox" id="help-only"> <span>Показать только деревья, которым нужна помощь</span></label>
-          <p class="legend-note">Состояние: нужен полив, требуется осмотр, повреждено, болеет.</p>
-          <label class="check"><input type="checkbox" id="help-stale"> <span>…и давно не осматривали (60 дней)</span></label>
-          <label class="check"><input type="checkbox" id="help-dry"> <span>…и давно не поливали (14 дней, май–сентябрь)</span></label>
-          <p class="summary-line" id="help-count" aria-live="polite"></p>
-        </fieldset>
       </form>
     </details>
     <details id="unplaced">

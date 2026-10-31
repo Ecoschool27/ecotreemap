@@ -12,7 +12,7 @@
   var cfg = window.ECO_CONFIG || {};
   var $ = function (id) { return document.getElementById(id); };
 
-  var LIMITS = { notes: 500, author: 60, event: 120, species_note: 60 };
+  var LIMITS = { notes: 500, author: 60, event: 120 };
   var PHOTO = { maxInputBytes: 25 * 1024 * 1024, maxSide: 1200, maxBytes: 400 * 1024 };
   var GPS_WINDOW_MS = 10000;
   var THRESHOLD = typeof cfg.FIELD_GPS_ACCURACY_M === 'number' && cfg.FIELD_GPS_ACCURACY_M > 0 ? cfg.FIELD_GPS_ACCURACY_M : 10;
@@ -187,14 +187,10 @@
     var trees = data.trees;
     var treeById = Object.create(null);
     trees.forEach(function (t) { treeById[t.id] = t; });
-    // префикс номера породы — из data/species.js (prefix: L, TB …); для старых записей без prefix — по номерам
+    // префикс номера породы — по существующим номерам (L-001 → «L»)
     var prefixOf = Object.create(null);
-    Object.keys(species).forEach(function (k) {
-      var p = species[k] && species[k].prefix;
-      if (typeof p === 'string' && /^[A-Z]{1,2}$/.test(p)) prefixOf[k] = p;
-    });
     trees.forEach(function (t) {
-      var m = ECO.ID_RE.test(t.id) && /^([A-Z]{1,2})-/.exec(t.id);
+      var m = ECO.ID_RE.test(t.id) && /^([A-Z])-/.exec(t.id);
       if (m && ECO.hasOwn(species, t.species) && !prefixOf[t.species]) prefixOf[t.species] = m[1];
     });
     var device = deviceId();
@@ -224,7 +220,7 @@
         if (m && +m[1] > max) max = +m[1];
       });
       var n = max + 1;
-      if (n > 999) return null; // формат номера ^[A-Z]{1,2}-\d{3}$ — больше 999 деревьев одной породы не выдаём
+      if (n > 999) return null; // формат номера ^[A-Z]-\d{3}$ — больше 999 деревьев одной породы не выдаём
       return p + '-' + ('00' + n).slice(-3);
     }
     function freeExisting(sp) {
@@ -249,8 +245,6 @@
       $('box-inspect').hidden = k !== 'inspect';
       $('box-location').hidden = k === 'inspect';
       $('box-event').hidden = k !== 'new_tree';
-      $('box-species-note').hidden = !(k === 'new_tree' && selSpecies.value === 'other');
-      $('box-water').hidden = k !== 'inspect';
       if (k === 'place_existing') fillExisting();
       if (k === 'new_tree') $('f-new-id').textContent = 'Номер нового дерева: ' + (nextNewId(selSpecies.value) || '—');
       if (k === 'inspect') renderNearest();
@@ -270,11 +264,9 @@
       var f = $('tree-facts');
       if (!t) { f.textContent = k === 'inspect' ? 'Дерево не выбрано.' : ''; return; }
       var sp = ECO.speciesOf(data, t);
-      var lw = k === 'inspect' ? ECO.lastWatered(t) : null;
-      f.textContent = ECO.sentence('Дерево ' + t.id + ': ' + sp.name_ru + ', посажено ' +
-        (ECO.formatDate(t.planted_date) || (t.planted_year ? t.planted_year + ' г.' : 'год не указан'))) +
-        (k === 'place_existing' ? ' Порода и год берутся из реестра и не меняются.' : '') +
-        (lw ? ' Последний полив: ' + ECO.sentence(ECO.formatDate(lw)) : '');
+      f.textContent = 'Дерево ' + t.id + ': ' + sp.name_ru + ', посажено ' +
+        (ECO.formatDate(t.planted_date) || (t.planted_year ? t.planted_year + ' г.' : 'год не указан')) +
+        (k === 'place_existing' ? '. Порода и год берутся из реестра и не меняются.' : '.');
     }
     Array.prototype.forEach.call(document.querySelectorAll('input[name="kind"]'), function (r) {
       r.addEventListener('change', updateKind);
@@ -532,8 +524,7 @@
       if (rec.status !== null && !ECO.hasOwn(STATUS_TEXT, rec.status)) throw new Error('Неизвестное состояние.');
       if (k === 'inspect') {
         if (!inspectTarget) throw new Error('Выберите дерево: номер с таблички или одно из ближайших.');
-        rec.watered = $('f-watered').checked;
-        if (!rec.status && !rec.notes && !rec.photo && !rec.watered) throw new Error('Для осмотра укажите состояние, полив, заметку или фото.');
+        if (!rec.status && !rec.notes && !rec.photo) throw new Error('Для осмотра укажите состояние, заметку или фото.');
         rec.id = inspectTarget.id;
         rec.species = inspectTarget.species;
         return rec;
@@ -555,10 +546,6 @@
       }
       // новое дерево
       rec.species = selSpecies.value;
-      if (rec.species === 'other') {
-        rec.species_note = cleanText($('f-species-note').value, LIMITS.species_note);
-        if (!rec.species_note) throw new Error('Для «Другая порода» укажите название породы (до 60 знаков).');
-      }
       rec.id = nextNewId(rec.species);
       if (!rec.id) throw new Error('Не удалось выдать номер для этой породы.');
       var y = Number($('f-year').value);
@@ -577,7 +564,7 @@
     // ---------- форма на время съёмки ----------
     var FORM_KEY = 'ecotreemap_field_form_v1';
     var FORM_FIELDS = ['f-species', 'f-existing', 'f-year', 'f-date', 'f-inspect-id', 'f-status', 'f-event', 'f-event-custom',
-      'f-observed', 'f-notes', 'f-author', 'f-species-note'];
+      'f-observed', 'f-notes', 'f-author'];
     function sessionGet(k) { try { return window.sessionStorage.getItem(k); } catch (e) { return null; } }
     function sessionSet(k, v) { try { window.sessionStorage.setItem(k, v); } catch (e) { /* хранилище недоступно */ } }
     function sessionRemove(k) { try { window.sessionStorage.removeItem(k); } catch (e) { /* хранилище недоступно */ } }
@@ -627,8 +614,6 @@
       $('photo-preview').hidden = true;
       $('photo-status').textContent = '';
       selStatus.value = '';
-      $('f-watered').checked = false;
-      $('f-species-note').value = '';
     }
     $('btn-save').addEventListener('click', function () {
       if (state.saving) return;
@@ -650,28 +635,6 @@
         result('Не удалось сохранить: ' + (e && e.message ? e.message : e), true);
       }).then(function () { state.saving = false; });
     });
-
-    // Быстрая отметка полива: тот же путь, что осмотр (выгрузка → tools/merge_field.py → история на сайте).
-    $('btn-water-quick').addEventListener('click', function () {
-      $('f-watered').checked = true;
-      $('btn-save').click();
-    });
-    // Ссылка с паспорта: field.html?id=L-001&action=water — сразу осмотр этого дерева с отметкой полива.
-    function openFromLink() {
-      var q = new URLSearchParams(window.location.search);
-      var id = (q.get('id') || '').trim().toUpperCase();
-      if (!ECO.ID_RE.test(id) || !findTree(id)) return false;
-      document.querySelector('input[name="kind"][value="inspect"]').checked = true;
-      updateKind();
-      $('f-inspect-id').value = id;
-      pickInspect();
-      if (q.get('action') === 'water') {
-        $('f-watered').checked = true;
-        result('Дерево ' + id + ': отметка «Полил(а)» выбрана. Нажмите «Сохранить запись на телефоне». ' +
-          'Отметка появится на сайте после выгрузки и добавления координатором.', false);
-      }
-      return true;
-    }
 
     // ---------- табличка ----------
     var plaqueCanvas = null, plaqueId = null;
@@ -726,7 +689,7 @@
         var li = el('li', null, [
           el('b', { text: r.id }),
           ' · ' + KIND_TEXT[r.kind] + ' · ' + (r.status ? STATUS_TEXT[r.status] || r.status : 'без состояния') +
-            (r.watered ? ' · полито' : '') + (r.photo ? ' · фото' : '') + ' · ' + (r.exported_at ? 'выгружено' : 'не выгружено')
+            (r.photo ? ' · фото' : '') + ' · ' + (r.exported_at ? 'выгружено' : 'не выгружено')
         ]);
         if (r.kind !== 'inspect' && siteBase()) {
           li.appendChild(el('button', { type: 'button', className: 'btn btn--outline', text: 'Табличка', onclick: function () { showPlaque(r); $('plaque-card').scrollIntoView(); } }));
@@ -830,14 +793,14 @@
 
     window.ECO_FIELD = {
       baseUrlProblem: baseUrlProblem, treeUrl: treeUrl, nextNewId: nextNewId, processPhoto: processPhoto,
-      exportRecords: exportRecords, records: function () { return records; }, prefixOf: prefixOf, state: state, map: map, formKey: FORM_KEY,
+      exportRecords: exportRecords, records: function () { return records; }, state: state, map: map, formKey: FORM_KEY,
       marker: function () { return marker; }, threshold: THRESHOLD
     };
 
     return STORE.all().then(function (list) {
       records = (list || []).filter(function (r) { return r && typeof r.record_uid === 'string' && ECO.ID_RE.test(r.id || ''); });
       updateKind();
-      if (!restoreFormAfterCamera()) openFromLink();
+      restoreFormAfterCamera();
       renderRecords();
       window.ECO_PAGE_DONE = true;
     }, function (e) {
