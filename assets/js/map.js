@@ -4,6 +4,11 @@
   'use strict';
   var ECO = window.ECO;
   if (!ECO) return; // common.js не загрузился — сообщение покажет страховка в index.html
+  // Страховка от смешения версий в кэше браузера (этот файл новее common.js): нет функции — тихая деградация.
+  if (typeof ECO.t !== 'function') ECO.t = window.ECO_T || function (k, ru) { return ru; };
+  if (typeof ECO.spName !== 'function') ECO.spName = function (sp) { return sp ? sp.name_ru : ''; };
+  if (typeof ECO.helpReasons !== 'function') ECO.helpReasons = function () { return { status: false, stale: false, dry: false }; };
+  if (typeof ECO.patronOf !== 'function') ECO.patronOf = function () { return ''; };
   ECO.needsCluster = true;
 
   var params = new URLSearchParams(window.location.search);
@@ -70,6 +75,18 @@
           ECO.el('span', { className: 'legend-count', text: count + ' ' + ECO.treesWord(count) })
         ])
       );
+    });
+
+    // ----- шефство: фильтр «под опекой / ищут опекуна» -----
+    var patronBox = document.getElementById('patron-filter');
+    var withPatron = trees.filter(function (t) { return !!ECO.patronOf(t); }).length;
+    [['yes', 'Под опекой', withPatron, '#1b5e20'], ['no', 'Ищут опекуна', total - withPatron, '#ffffff']].forEach(function (row) {
+      patronBox.appendChild(ECO.el('label', { className: 'check' }, [
+        ECO.el('input', { type: 'checkbox', checked: true, attrs: { 'data-patron': row[0] } }),
+        ECO.el('span', { className: 'dot dot--ring', style: 'background:' + row[3] }),
+        ECO.el('span', { text: row[1] }),
+        ECO.el('span', { className: 'legend-count', text: row[2] + ' ' + ECO.treesWord(row[2]) })
+      ]));
     });
 
     // ----- список деревьев без места (паспорта доступны и без координат) -----
@@ -158,6 +175,7 @@
           ECO.el('p', { text: 'Посажено: ' + (ECO.formatDate(t.planted_date) || t.planted_year + ' г.') }),
           ECO.el('p', { text: 'Лет с посадки: ' + ECO.yearsSincePlanting(t.planted_year, null, t.planted_date) }),
           t.event ? ECO.el('p', { text: 'Акция: ' + t.event }) : null,
+          ECO.el('p', { text: ECO.patronOf(t) ? 'Под опекой: ' + ECO.patronOf(t) : 'Ищет опекуна' }),
           ECO.el('a', { href: passportHref(t.id), text: 'Открыть паспорт дерева →' })
         ]);
       });
@@ -173,17 +191,40 @@
       return out;
     }
 
+    // «Нужна помощь»: состояние из списка; по галкам — ещё давно не осмотренные / давно не политые (только с местом)
+    var helpOnly = document.getElementById('help-only');
+    var helpStale = document.getElementById('help-stale');
+    var helpDry = document.getElementById('help-dry');
+    var helpCount = document.getElementById('help-count');
+    var today = new Date();
+    function needsHelp(t) {
+      var r = ECO.helpReasons(t, today);
+      return r.status || (helpStale.checked && r.stale) || (helpDry.checked && r.dry);
+    }
     function applyFilter() {
       var sp = checkedValues(speciesBox, 'data-species');
       var yr = checkedValues(yearBox, 'data-year');
+      var pt = checkedValues(patronBox, 'data-patron');
+      var help = helpOnly.checked;
       var visible = [];
+      var helpN = 0;
       Object.keys(markers).forEach(function (id) {
         var m = markers[id];
-        if (sp.indexOf(m.tree.species) !== -1 && yr.indexOf(String(m.tree.planted_year)) !== -1) visible.push(m.marker);
+        var h = needsHelp(m.tree);
+        if (h) helpN++;
+        m.marker.setStyle(h && help ? { color: '#a1261b', weight: 4 } : { color: '#ffffff', weight: 2 });
+        if (sp.indexOf(m.tree.species) !== -1 && yr.indexOf(String(m.tree.planted_year)) !== -1 &&
+            pt.indexOf(ECO.patronOf(m.tree) ? 'yes' : 'no') !== -1 && (!help || h)) visible.push(m.marker);
       });
+      var helpOff = trees.filter(function (t) { return !ECO.hasCoords(t) && needsHelp(t); }).length;
+      helpCount.textContent = helpN
+        ? 'Нужна помощь: ' + helpN + ' ' + ECO.treesWord(helpN) + ' на карте' + (helpOff ? '; ещё ' + helpOff + ' без места на карте' : '')
+        : 'Сейчас нет отмеченных на карте деревьев, которым нужна помощь' + (helpOff ? ' (без места на карте: ' + helpOff + ')' : '') + '.';
       cluster.clearLayers();
       cluster.addLayers(visible);
-      if (!placed.length) {
+      if (help && !helpN) {
+        noticeLines.places = 'Деревьев, которым нужна помощь, на карте сейчас нет.';
+      } else if (!placed.length) {
         noticeLines.places = 'Места посадок ещё не отмечены на карте (0 из ' + total + '). ' +
           'Паспорта деревьев открываются из списка «Место не отмечено».';
       } else if (!visible.length) {

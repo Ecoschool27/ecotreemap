@@ -13,6 +13,10 @@
 //   в папке images/; photo_date — дата снимка; observations — история осмотров [{date, status, notes}]
 //   (до 10, новые сверху); coord_accuracy_m — точность GPS в метрах; coord_source — gps | gps-low | gps+manual | manual
 //   (gps-low — GPS хуже порога точности, место приблизительное; manual — поставлено вручную на карте).
+// Номера новых пород: префикс из data/species.js (1–2 буквы: TB-001); species "other" — «Другая порода»,
+//   её название — в species_note (до 60 знаков). observations[].watered = true — отметка полива;
+//   observations[].photo — фото осмотра "trees/<номер>/<ГГГГ-ММ-ДД>.jpg" (photo дерева — последнее фото).
+// Шефство (только tools/editor.html): patron — класс или группа (до 80 знаков, без имён); patron_since — дата.
 // Не вписывайте сюда числа и факты без подтверждения.
 // Сохранено редактором tools/editor.html: 2026-10-31T22:41:58.853Z
 window.ECO_TREES = [

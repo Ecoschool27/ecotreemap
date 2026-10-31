@@ -6,15 +6,21 @@
   'use strict';
   var ECO = window.ECO;
   if (!ECO) return;
+  // Страховка от смешения версий в кэше браузера (этот файл новее common.js): нет функции — тихая деградация.
+  if (typeof ECO.t !== 'function') ECO.t = window.ECO_T || function (k, ru) { return ru; };
+  if (typeof ECO.spName !== 'function') ECO.spName = function (sp) { return sp ? sp.name_ru : ''; };
+  if (typeof ECO.lastWatered !== 'function') ECO.lastWatered = function () { return null; };
+  if (typeof ECO.sentence !== 'function') ECO.sentence = function (s) { return String(s); };
   var el = ECO.el;
   var L = window.L;
   var STORE = window.ECO_FIELD_STORE;
   var cfg = window.ECO_CONFIG || {};
   var $ = function (id) { return document.getElementById(id); };
 
-  var LIMITS = { notes: 500, author: 60, event: 120 };
+  var LIMITS = { notes: 500, author: 60, event: 120, species_note: 60 };
   var PHOTO = { maxInputBytes: 25 * 1024 * 1024, maxSide: 1200, maxBytes: 400 * 1024 };
   var GPS_WINDOW_MS = 10000;
+  var NEAREST_MOVE_M = 10; // список «ближайшие» сам перерисовывается только при сдвиге больше этого
   var THRESHOLD = typeof cfg.FIELD_GPS_ACCURACY_M === 'number' && cfg.FIELD_GPS_ACCURACY_M > 0 ? cfg.FIELD_GPS_ACCURACY_M : 10;
   var EVENT_CUSTOM = '__custom__';
   var EVENT_NONE = '';
@@ -187,10 +193,14 @@
     var trees = data.trees;
     var treeById = Object.create(null);
     trees.forEach(function (t) { treeById[t.id] = t; });
-    // префикс номера породы — по существующим номерам (L-001 → «L»)
+    // префикс номера породы — из data/species.js (prefix: L, TB …); для старых записей без prefix — по номерам
     var prefixOf = Object.create(null);
+    Object.keys(species).forEach(function (k) {
+      var p = species[k] && species[k].prefix;
+      if (typeof p === 'string' && /^[A-Z]{1,2}$/.test(p)) prefixOf[k] = p;
+    });
     trees.forEach(function (t) {
-      var m = ECO.ID_RE.test(t.id) && /^([A-Z])-/.exec(t.id);
+      var m = ECO.ID_RE.test(t.id) && /^([A-Z]{1,2})-/.exec(t.id);
       if (m && ECO.hasOwn(species, t.species) && !prefixOf[t.species]) prefixOf[t.species] = m[1];
     });
     var device = deviceId();
@@ -220,7 +230,7 @@
         if (m && +m[1] > max) max = +m[1];
       });
       var n = max + 1;
-      if (n > 999) return null; // формат номера ^[A-Z]-\d{3}$ — больше 999 деревьев одной породы не выдаём
+      if (n > 999) return null; // формат номера ^[A-Z]{1,2}-\d{3}$ — больше 999 деревьев одной породы не выдаём
       return p + '-' + ('00' + n).slice(-3);
     }
     function freeExisting(sp) {
@@ -245,6 +255,8 @@
       $('box-inspect').hidden = k !== 'inspect';
       $('box-location').hidden = k === 'inspect';
       $('box-event').hidden = k !== 'new_tree';
+      $('box-species-note').hidden = !(k === 'new_tree' && selSpecies.value === 'other');
+      $('box-water').hidden = k !== 'inspect';
       if (k === 'place_existing') fillExisting();
       if (k === 'new_tree') $('f-new-id').textContent = 'Номер нового дерева: ' + (nextNewId(selSpecies.value) || '—');
       if (k === 'inspect') renderNearest();
@@ -264,9 +276,11 @@
       var f = $('tree-facts');
       if (!t) { f.textContent = k === 'inspect' ? 'Дерево не выбрано.' : ''; return; }
       var sp = ECO.speciesOf(data, t);
-      f.textContent = 'Дерево ' + t.id + ': ' + sp.name_ru + ', посажено ' +
-        (ECO.formatDate(t.planted_date) || (t.planted_year ? t.planted_year + ' г.' : 'год не указан')) +
-        (k === 'place_existing' ? '. Порода и год берутся из реестра и не меняются.' : '.');
+      var lw = k === 'inspect' ? ECO.lastWatered(t) : null;
+      f.textContent = ECO.sentence('Дерево ' + t.id + ': ' + sp.name_ru + ', посажено ' +
+        (ECO.formatDate(t.planted_date) || (t.planted_year ? t.planted_year + ' г.' : 'год не указан'))) +
+        (k === 'place_existing' ? ' Порода и год берутся из реестра и не меняются.' : '') +
+        (lw ? ' Последний полив: ' + ECO.sentence(ECO.formatDate(lw)) : '');
     }
     Array.prototype.forEach.call(document.querySelectorAll('input[name="kind"]'), function (r) {
       r.addEventListener('change', updateKind);
@@ -295,14 +309,21 @@
       });
       return pts;
     }
+    // Список строится при первом отсчёте GPS, по кнопке «Обновить список» и при смене действия.
+    // Новые отсчёты GPS перерисовывают его, только если человек сместился больше чем на NEAREST_MOVE_M
+    // от точки последней отрисовки, и не перерисовывают вовсе, пока выбрано дерево из списка, —
+    // иначе кнопки пересоздаются под пальцем.
+    var nearest = { at: null, locked: false };
     function renderNearest() {
       var box = ECO.clear($('nearest-list'));
       var here = lastSample();
       if (!here) {
+        nearest.at = null;
         $('nearest-hint').textContent = 'Ближайшие отмеченные деревья появятся после включения GPS (раздел «Место» скрыт при осмотре — кнопка ниже).';
         box.appendChild(el('button', { type: 'button', className: 'btn', text: 'Включить GPS', onclick: startGps }));
         return;
       }
+      nearest.at = { lat: here.lat, lon: here.lon };
       var list = knownPoints().map(function (p) {
         return { id: p.id, d: distanceM([here.lat, here.lon], [p.lat, p.lon]) };
       }).sort(function (a, b) { return a.d - b.d; }).slice(0, 5);
@@ -310,16 +331,27 @@
       list.forEach(function (p) {
         box.appendChild(el('button', {
           type: 'button', className: 'btn btn--outline', text: p.id + ' · ' + Math.round(p.d) + ' м',
-          onclick: function () { $('f-inspect-id').value = p.id; pickInspect(); }
+          onclick: function () { nearest.locked = true; $('f-inspect-id').value = p.id; pickInspect(); }
         }));
       });
+      box.appendChild(el('button', {
+        type: 'button', className: 'btn', text: 'Обновить список',
+        onclick: function () { nearest.locked = false; renderNearest(); }
+      }));
+    }
+    function nearestOnFix(s) {
+      if (nearest.locked) return;
+      if (!nearest.at || distanceM([nearest.at.lat, nearest.at.lon], [s.lat, s.lon]) > NEAREST_MOVE_M) renderNearest();
     }
     function pickInspect() {
       var v = $('f-inspect-id').value.trim().toUpperCase();
       inspectTarget = ECO.ID_RE.test(v) ? findTree(v) : null;
       renderFacts();
     }
-    $('f-inspect-id').addEventListener('input', pickInspect);
+    $('f-inspect-id').addEventListener('input', function () {
+      nearest.locked = false; // номер вводят вручную — выбор из списка сброшен
+      pickInspect();
+    });
 
     // ---------- карта и точка ----------
     var map = null, marker = null, accCircle = null;
@@ -415,7 +447,7 @@
         else { accCircle.setLatLng([s.lat, s.lon]); accCircle.setRadius(s.acc); }
         if (!marker) map.setView([s.lat, s.lon], 18);
       }
-      if (kind() === 'inspect') renderNearest();
+      if (kind() === 'inspect') nearestOnFix(s);
     }
     // Взвешенное среднее 1/acc² по отсчётам последних ~10 с; точность — средняя по использованным отсчётам.
     function fixGps(force) {
@@ -524,7 +556,8 @@
       if (rec.status !== null && !ECO.hasOwn(STATUS_TEXT, rec.status)) throw new Error('Неизвестное состояние.');
       if (k === 'inspect') {
         if (!inspectTarget) throw new Error('Выберите дерево: номер с таблички или одно из ближайших.');
-        if (!rec.status && !rec.notes && !rec.photo) throw new Error('Для осмотра укажите состояние, заметку или фото.');
+        rec.watered = $('f-watered').checked;
+        if (!rec.status && !rec.notes && !rec.photo && !rec.watered) throw new Error('Для осмотра укажите состояние, полив, заметку или фото.');
         rec.id = inspectTarget.id;
         rec.species = inspectTarget.species;
         return rec;
@@ -546,6 +579,10 @@
       }
       // новое дерево
       rec.species = selSpecies.value;
+      if (rec.species === 'other') {
+        rec.species_note = cleanText($('f-species-note').value, LIMITS.species_note);
+        if (!rec.species_note) throw new Error('Для «Другая порода» укажите название породы (до 60 знаков).');
+      }
       rec.id = nextNewId(rec.species);
       if (!rec.id) throw new Error('Не удалось выдать номер для этой породы.');
       var y = Number($('f-year').value);
@@ -564,7 +601,7 @@
     // ---------- форма на время съёмки ----------
     var FORM_KEY = 'ecotreemap_field_form_v1';
     var FORM_FIELDS = ['f-species', 'f-existing', 'f-year', 'f-date', 'f-inspect-id', 'f-status', 'f-event', 'f-event-custom',
-      'f-observed', 'f-notes', 'f-author'];
+      'f-observed', 'f-notes', 'f-author', 'f-species-note'];
     function sessionGet(k) { try { return window.sessionStorage.getItem(k); } catch (e) { return null; } }
     function sessionSet(k, v) { try { window.sessionStorage.setItem(k, v); } catch (e) { /* хранилище недоступно */ } }
     function sessionRemove(k) { try { window.sessionStorage.removeItem(k); } catch (e) { /* хранилище недоступно */ } }
@@ -572,7 +609,7 @@
       var v = {};
       FORM_FIELDS.forEach(function (id) { v[id] = $(id).value; });
       sessionSet(FORM_KEY, JSON.stringify({
-        kind: kind(), values: v,
+        kind: kind(), values: v, watered: $('f-watered').checked, // флажок: .value у checkbox не отражает отметку
         point: state.lat === null ? null : { lat: state.lat, lon: state.lon, source: state.source, acc: state.acc }
       }));
     }
@@ -599,12 +636,14 @@
       }
       updateKindKeep();
       pickInspect();
+      $('f-watered').checked = s.watered === true;
       $('photo-status').textContent = 'Форма восстановлена после перезагрузки страницы. Выберите фото ещё раз.';
       return true;
     }
 
     function resetForm() {
       sessionRemove(FORM_KEY);
+      nearest.locked = false;
       state.lat = state.lon = state.acc = state.source = null;
       state.photo = null;
       if (marker && map) { map.removeLayer(marker); marker = null; }
@@ -614,6 +653,8 @@
       $('photo-preview').hidden = true;
       $('photo-status').textContent = '';
       selStatus.value = '';
+      $('f-watered').checked = false;
+      $('f-species-note').value = '';
     }
     $('btn-save').addEventListener('click', function () {
       if (state.saving) return;
@@ -635,6 +676,28 @@
         result('Не удалось сохранить: ' + (e && e.message ? e.message : e), true);
       }).then(function () { state.saving = false; });
     });
+
+    // Быстрая отметка полива: тот же путь, что осмотр (выгрузка → tools/merge_field.py → история на сайте).
+    $('btn-water-quick').addEventListener('click', function () {
+      $('f-watered').checked = true;
+      $('btn-save').click();
+    });
+    // Ссылка с паспорта: field.html?id=L-001&action=water — сразу осмотр этого дерева с отметкой полива.
+    function openFromLink() {
+      var q = new URLSearchParams(window.location.search);
+      var id = (q.get('id') || '').trim().toUpperCase();
+      if (!ECO.ID_RE.test(id) || !findTree(id)) return false;
+      document.querySelector('input[name="kind"][value="inspect"]').checked = true;
+      updateKind();
+      $('f-inspect-id').value = id;
+      pickInspect();
+      if (q.get('action') === 'water') {
+        $('f-watered').checked = true;
+        result('Дерево ' + id + ': отметка «Полил(а)» выбрана. Нажмите «Сохранить запись на телефоне». ' +
+          'Отметка появится на сайте после выгрузки и добавления координатором.', false);
+      }
+      return true;
+    }
 
     // ---------- табличка ----------
     var plaqueCanvas = null, plaqueId = null;
@@ -689,7 +752,7 @@
         var li = el('li', null, [
           el('b', { text: r.id }),
           ' · ' + KIND_TEXT[r.kind] + ' · ' + (r.status ? STATUS_TEXT[r.status] || r.status : 'без состояния') +
-            (r.photo ? ' · фото' : '') + ' · ' + (r.exported_at ? 'выгружено' : 'не выгружено')
+            (r.watered ? ' · полито' : '') + (r.photo ? ' · фото' : '') + ' · ' + (r.exported_at ? 'выгружено' : 'не выгружено')
         ]);
         if (r.kind !== 'inspect' && siteBase()) {
           li.appendChild(el('button', { type: 'button', className: 'btn btn--outline', text: 'Табличка', onclick: function () { showPlaque(r); $('plaque-card').scrollIntoView(); } }));
@@ -793,14 +856,19 @@
 
     window.ECO_FIELD = {
       baseUrlProblem: baseUrlProblem, treeUrl: treeUrl, nextNewId: nextNewId, processPhoto: processPhoto,
-      exportRecords: exportRecords, records: function () { return records; }, state: state, map: map, formKey: FORM_KEY,
+      exportRecords: exportRecords, records: function () { return records; }, prefixOf: prefixOf, state: state, map: map, formKey: FORM_KEY,
       marker: function () { return marker; }, threshold: THRESHOLD
     };
 
     return STORE.all().then(function (list) {
       records = (list || []).filter(function (r) { return r && typeof r.record_uid === 'string' && ECO.ID_RE.test(r.id || ''); });
+      // все деревья реестра уже на карте (и не заняты записями этого телефона) — по умолчанию «Осмотр»
+      var claimed = localClaims();
+      if (!trees.some(function (t) { return !ECO.hasCoords(t) && !claimed[t.id]; })) {
+        document.querySelector('input[name="kind"][value="inspect"]').checked = true;
+      }
       updateKind();
-      restoreFormAfterCamera();
+      if (!restoreFormAfterCamera()) openFromLink();
       renderRecords();
       window.ECO_PAGE_DONE = true;
     }, function (e) {

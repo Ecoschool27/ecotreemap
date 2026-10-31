@@ -117,8 +117,76 @@
     if (status === null || status === undefined || status === '') return 'нет данных (не обследовано)';
     return ECO.hasOwn(STATUS_LABELS, status) ? STATUS_LABELS[status] : String(status);
   };
-  // Номер дерева: буква породы, дефис, 3–4 цифры (L-001). Используется для ссылок и черновиков.
-  ECO.ID_RE = /^[A-Z]-\d{3}$/;
+  // Номер дерева: 1–2 буквы породы (префикс из data/species.js), дефис, 3 цифры (L-001, TB-001).
+  ECO.ID_RE = /^[A-Z]{1,2}-\d{3}$/;
+
+  // Фраза с точкой в конце без удвоения («13 мая 2026 г.» + «.» → одна точка).
+  ECO.sentence = function (s) {
+    s = String(s);
+    return /[.!?…]$/.test(s) ? s : s + '.';
+  };
+
+  // ---------- шефство ----------
+  // patron — только название группы/класса (без имён), до 80 знаков; patron_since — дата ГГГГ-ММ-ДД.
+  ECO.PATRON_MAX = 80;
+  ECO.patronOf = function (t) {
+    if (!t || typeof t.patron !== 'string') return '';
+    var v = t.patron.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').trim();
+    return v.length <= ECO.PATRON_MAX ? v : '';
+  };
+
+  // ---------- осмотры, полив, «нужна помощь» ----------
+  ECO.HELP_STATUSES = ['needs_water', 'needs_check', 'damaged', 'sick'];
+  ECO.STALE_DAYS = 60;   // «давно не осматривали»
+  ECO.DRY_DAYS = 14;     // «давно не поливали» (только май–сентябрь)
+  ECO.validObservations = function (t) {
+    return t && Array.isArray(t.observations) ? t.observations.filter(function (o) {
+      return o && typeof o === 'object' && ECO.parseDate(o.date);
+    }) : [];
+  };
+  function maxDate(list) {
+    var best = null;
+    list.forEach(function (d) { if (ECO.parseDate(d) && (!best || d > best)) best = d; });
+    return best;
+  }
+  // Осмотр — запись с указанным состоянием (как в статистике «Осмотрено»). Отметка «только полив»
+  // или заметка без состояния осмотром не считается и «давно не осматривали» не сбрасывает.
+  ECO.hasStatus = function (o) {
+    return !!o && typeof o.status === 'string' && ECO.hasOwn(STATUS_LABELS, o.status);
+  };
+  ECO.lastInspection = function (t) {
+    return maxDate(ECO.validObservations(t).filter(ECO.hasStatus).map(function (o) { return o.date; })
+      .concat(ECO.hasStatus(t) ? [t.status_date] : []));
+  };
+  ECO.lastWatered = function (t) {
+    return maxDate(ECO.validObservations(t).filter(function (o) { return o.watered === true; })
+      .map(function (o) { return o.date; }));
+  };
+  function isoOf(d) {
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  ECO.daysBetween = function (iso, now) {
+    var p = ECO.parseDate(iso);
+    if (!p) return null;
+    var n = ECO.parseDate(isoOf(now));
+    return Math.round((Date.UTC(n.y, n.m - 1, n.d) - Date.UTC(p.y, p.m - 1, p.d)) / 86400000);
+  };
+  // Причины, по которым дереву нужна помощь: {status, stale, dry}. now — Date (для проверок).
+  ECO.helpReasons = function (t, now) {
+    now = now instanceof Date ? now : new Date();
+    var r = { status: false, stale: false, dry: false };
+    if (!t) return r;
+    r.status = ECO.HELP_STATUSES.indexOf(t.status) !== -1;
+    if (!ECO.hasCoords(t) || t.status === 'dead') return r;
+    var li = ECO.lastInspection(t);
+    r.stale = !li || ECO.daysBetween(li, now) > ECO.STALE_DAYS;
+    var month = now.getMonth() + 1;
+    if (month >= 5 && month <= 9) {
+      var lw = ECO.lastWatered(t);
+      r.dry = !lw || ECO.daysBetween(lw, now) > ECO.DRY_DAYS;
+    }
+    return r;
+  };
 
   // ---------- данные ----------
   ECO.hasCoords = function (t) {
@@ -182,9 +250,24 @@
     return { ok: true, trees: clean, species: species, errors: errors, warnings: warnings };
   };
 
+  // Порода дерева. Для «Другая порода» (other) название берётся из species_note дерева (до 60 знаков).
+  ECO.SPECIES_NOTE_MAX = 60;
+  ECO.speciesNote = function (tree) {
+    if (!tree || typeof tree.species_note !== 'string') return '';
+    var v = tree.species_note.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').trim();
+    return v.length <= ECO.SPECIES_NOTE_MAX ? v : '';
+  };
   ECO.speciesOf = function (data, tree) {
+    var sp = data.species[tree.species];
+    if (sp && tree.species === 'other' && ECO.speciesNote(tree)) {
+      var copy = {};
+      Object.keys(sp).forEach(function (k) { copy[k] = sp[k]; });
+      copy.name_ru = ECO.speciesNote(tree);
+      copy.name_lat = '';
+      return copy;
+    }
     return (
-      data.species[tree.species] || {
+      sp || {
         name_ru: 'порода не указана',
         name_lat: '',
         color: '#5f6368'
@@ -244,11 +327,40 @@
   };
 
   // ---------- фото конкретного дерева (из полевого режима) ----------
-  // Путь только вида trees/<номер>.jpg и только для своего номера. Иначе null.
+  // Путь только вида trees/<номер>.jpg (старый) или trees/<номер>/<ГГГГ-ММ-ДД>[-N].jpg и только для своего номера.
+  // Суффикс -N (N = 2…999) — второе и следующие фото того же дерева за тот же день (tools/merge_field.py).
+  var TREE_PHOTO_RE = /^trees\/([A-Z]{1,2}-[0-9]{3})(?:\/([0-9]{4}-[0-9]{2}-[0-9]{2})(?:-(?:[2-9]|[1-9][0-9]{1,2}))?)?\.jpg$/;
+  var OBS_PHOTO_RE = /^trees\/([A-Z]{1,2}-[0-9]{3})\/([0-9]{4}-[0-9]{2}-[0-9]{2})(?:-(?:[2-9]|[1-9][0-9]{1,2}))?\.jpg$/;
   ECO.treePhotoPath = function (t) {
     if (!t || typeof t.photo !== 'string') return null;
-    var m = /^trees\/([A-Z]-\d{3})\.jpg$/.exec(t.photo);
-    return m && m[1] === t.id ? t.photo : null;
+    var m = TREE_PHOTO_RE.exec(t.photo);
+    return m && m[1] === t.id && (!m[2] || ECO.parseDate(m[2])) ? t.photo : null;
+  };
+  // Фото осмотра: trees/<номер>/<дата осмотра>[-N].jpg — только своего дерева и своей даты.
+  ECO.obsPhotoPath = function (t, o) {
+    if (!t || !o || typeof o.photo !== 'string') return null;
+    var m = OBS_PHOTO_RE.exec(o.photo);
+    return m && m[1] === t.id && m[2] === o.date && ECO.parseDate(m[2]) ? o.photo : null;
+  };
+  // Все фото дерева во времени, новые первыми: [{path, date, status}].
+  ECO.photoHistory = function (t) {
+    var out = [];
+    var seen = Object.create(null);
+    ECO.validObservations(t).forEach(function (o) {
+      var p = ECO.obsPhotoPath(t, o);
+      if (p && !seen[p]) { seen[p] = true; out.push({ path: p, date: o.date, status: o.status || null }); }
+    });
+    var main = ECO.treePhotoPath(t);
+    if (main && !seen[main]) {
+      out.push({ path: main, date: ECO.parseDate(t.photo_date) ? t.photo_date : null, status: null });
+    }
+    // новые первыми; за один день — по суффиксу -N (второе фото дня новее первого)
+    function dayNo(p) { var m = /[0-9]{4}-[0-9]{2}-[0-9]{2}-([0-9]{1,3})\.jpg$/.exec(p); return m ? +m[1] : 1; }
+    out.sort(function (a, b) {
+      var da = a.date || '', db = b.date || '';
+      return da < db ? 1 : da > db ? -1 : dayNo(b.path) - dayNo(a.path);
+    });
+    return out;
   };
   // Фото дерева с подписью «Фото дерева, <дата>; Фото: участники проекта EcoTreeMap».
   // Если файла нет — подставляется блок фото породы (fallback).

@@ -6,8 +6,8 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:,">
 <title>Полевой режим — EcoTreeMap</title>
-<link rel="stylesheet" href="../assets/lib/leaflet/leaflet.css">
-<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/lib/leaflet/leaflet.css?v=a7837102">
+<link rel="stylesheet" href="../assets/css/site.css?v=b251a9ba">
 </head>
 <body class="page-field">
 <header class="site-header">
@@ -49,12 +49,21 @@
       <input type="number" id="f-year" min="1900" step="1" inputmode="numeric">
       <label for="f-date">Дата посадки (если известна)</label>
       <input type="date" id="f-date">
+      <div id="box-species-note" hidden>
+        <label for="f-species-note">Название породы (обязательно, до 60 знаков)</label>
+        <input type="text" id="f-species-note" maxlength="60" autocomplete="off">
+      </div>
     </div>
     <div id="box-inspect" hidden>
       <p class="muted" id="nearest-hint">Ближайшие отмеченные деревья появятся после включения GPS.</p>
       <div id="nearest-list" class="btn-row"></div>
       <label for="f-inspect-id">Номер дерева (с таблички)</label>
       <input type="text" id="f-inspect-id" maxlength="6" autocomplete="off" placeholder="например, L-001">
+    </div>
+    <div id="box-water" hidden>
+      <label class="check"><input type="checkbox" id="f-watered"> Полил(а) дерево (дата — дата осмотра)</label>
+      <button type="button" class="btn btn--water btn--block" id="btn-water-quick">Полил(а) — сохранить сразу</button>
+      <p class="muted">Отметка полива появится на сайте после выгрузки и добавления координатором.</p>
     </div>
     <p class="muted" id="tree-facts" aria-live="polite"></p>
   </section>
@@ -143,14 +152,14 @@
 </main>
 <noscript><p class="fatal">Для полевого режима нужен JavaScript.</p></noscript>
 
-<script src="../assets/js/config.js"></script>
-<script src="../data/species.js"></script>
-<script src="../data/trees.js"></script>
-<script src="../assets/lib/leaflet/leaflet.js"></script>
-<script src="../assets/lib/qrcode-generator/qrcode.js"></script>
-<script src="../assets/js/common.js"></script>
-<script src="../assets/js/field-store.js"></script>
-<script src="../assets/js/field.js"></script>
+<script src="../assets/js/config.js?v=acde99e3"></script>
+<script src="../data/species.js?v=87965e18"></script>
+<script src="../data/trees.js?v=e7938355"></script>
+<script src="../assets/lib/leaflet/leaflet.js?v=db49d009"></script>
+<script src="../assets/lib/qrcode-generator/qrcode.js?v=79ec86f8"></script>
+<script src="../assets/js/common.js?v=6d6cdff5"></script>
+<script src="../assets/js/field-store.js?v=8e4caa31"></script>
+<script src="../assets/js/field.js?v=3fb60b31"></script>
 <script>
   window.addEventListener('load', function () {
     if (window.ECO_PAGE_DONE || window.ECO_FIELD) return; // ECO_FIELD ставится сразу, хранилище браузера открывается позже

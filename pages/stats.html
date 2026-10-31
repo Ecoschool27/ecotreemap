@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Статистика — EcoTreeMap</title>
+<link rel="stylesheet" href="../assets/css/site.css?v=b251a9ba">
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <h1>Статистика проекта</h1>
+    <p class="sub">Сколько посажено, осмотрено и под опекой</p>
+  </div>
+  <nav aria-label="Разделы сайта">
+    <a href="../index.html">Карта</a>
+    <a href="species.html">Породы</a>
+    <a href="credits.html">Источники</a>
+  </nav>
+</header>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<main class="page" id="content"></main>
+<noscript><p class="fatal">Для статистики нужен JavaScript. Включите его в браузере.</p></noscript>
+
+<script src="../assets/js/config.js?v=acde99e3"></script>
+<script src="../data/species.js?v=87965e18"></script>
+<script src="../data/trees.js?v=e7938355"></script>
+<script src="../assets/js/common.js?v=6d6cdff5"></script>
+<script src="../assets/js/stats.js?v=07f82cd3"></script>
+<script>
+  window.addEventListener('load', function () {
+    if (window.ECO_PAGE_DONE) return;
+    var box = document.getElementById('fatal');
+    box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
+    box.hidden = false;
+  });
+</script>
+</body>
+</html>

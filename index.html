@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
 <title>Карта посаженных деревьев — EcoTreeMap</title>
-<link rel="stylesheet" href="assets/lib/leaflet/leaflet.css">
-<link rel="stylesheet" href="assets/lib/markercluster/MarkerCluster.css">
-<link rel="stylesheet" href="assets/lib/markercluster/MarkerCluster.Default.css">
-<link rel="stylesheet" href="assets/css/site.css">
+<link rel="stylesheet" href="assets/lib/leaflet/leaflet.css?v=a7837102">
+<link rel="stylesheet" href="assets/lib/markercluster/MarkerCluster.css?v=614dea0a">
+<link rel="stylesheet" href="assets/lib/markercluster/MarkerCluster.Default.css?v=61258232">
+<link rel="stylesheet" href="assets/css/site.css?v=b251a9ba">
 </head>
 <body class="page-map">
 <header class="site-header">
@@ -18,6 +18,7 @@
   </div>
   <nav aria-label="Разделы сайта">
     <a href="pages/species.html">Породы</a>
+    <a href="pages/stats.html">Статистика</a>
     <a href="pages/credits.html">Источники</a>
   </nav>
 </header>
@@ -30,6 +31,14 @@
       <form id="filter-form" onsubmit="return false">
         <fieldset id="species-filter"><legend>Порода (цвет точки)</legend></fieldset>
         <fieldset id="year-filter"><legend>Год посадки</legend></fieldset>
+        <fieldset id="patron-filter"><legend>Шефство</legend></fieldset>
+        <fieldset id="help-filter"><legend>Нужна помощь</legend>
+          <label class="check"><input type="checkbox" id="help-only"> <span>Показать только деревья, которым нужна помощь</span></label>
+          <p class="legend-note">Состояние: нужен полив, требуется осмотр, повреждено, болеет.</p>
+          <label class="check"><input type="checkbox" id="help-stale"> <span>…и давно не осматривали (60 дней)</span></label>
+          <label class="check"><input type="checkbox" id="help-dry"> <span>…и давно не поливали (14 дней, май–сентябрь)</span></label>
+          <p class="summary-line" id="help-count" aria-live="polite"></p>
+        </fieldset>
       </form>
     </details>
     <details id="unplaced">
@@ -44,13 +53,13 @@
 </div>
 <noscript><p class="fatal">Для карты нужен JavaScript. Включите его в браузере.</p></noscript>
 
-<script src="assets/js/config.js"></script>
-<script src="data/species.js"></script>
-<script src="data/trees.js"></script>
-<script src="assets/lib/leaflet/leaflet.js"></script>
-<script src="assets/lib/markercluster/leaflet.markercluster.js"></script>
-<script src="assets/js/common.js"></script>
-<script src="assets/js/map.js"></script>
+<script src="assets/js/config.js?v=acde99e3"></script>
+<script src="data/species.js?v=87965e18"></script>
+<script src="data/trees.js?v=e7938355"></script>
+<script src="assets/lib/leaflet/leaflet.js?v=db49d009"></script>
+<script src="assets/lib/markercluster/leaflet.markercluster.js?v=1e4e1d22"></script>
+<script src="assets/js/common.js?v=6d6cdff5"></script>
+<script src="assets/js/map.js?v=4d415be4"></script>
 <script>
   // Страховка: если скрипты сайта не загрузились (сайт опубликован не полностью), показать причину.
   window.addEventListener('load', function () {
