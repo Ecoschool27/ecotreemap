@@ -289,9 +289,12 @@
       var txt = function (s) { return document.createTextNode(s); };
       var parts = ECO.tData('field.tree_info', 'Дерево {id}: {name}, посажено {date}',
         { id: txt(t.id), name: ECO.speciesFromNote(t) ? sp.name_ru : txt(sp.name_ru), date: txt(planted) });
-      if (!/[.!?…]$/.test(planted)) parts.push('.');
+      // точку решаем по тексту на языке страницы: kk-дата «2026 ж. 10 мамыр» без точки, ru «… 2026 г.» — с точкой
+      var onPage = typeof ECO.tr === 'function' ? ECO.tr : function (s) { return s; };
+      var endDot = function (s) { if (!/[.!?…]$/.test(String(onPage(s)).trim())) parts.push('.'); };
+      endDot(planted);
       if (k === 'place_existing') parts.push(' Порода и год берутся из реестра и не меняются.');
-      if (lw) parts.push(' Последний полив: ' + ECO.sentence(ECO.formatDate(lw)));
+      if (lw) { var lwText = ' Последний полив: ' + ECO.formatDate(lw); parts.push(lwText); endDot(lwText); }
       ECO.clear(f);
       parts.forEach(function (x) { f.appendChild(typeof x === 'string' ? txt(x) : x); });
     }
