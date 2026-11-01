@@ -54,19 +54,21 @@
     g.font = 'bold 40px sans-serif';
     g.fillText('EcoTreeMap', 72, 64);
     g.font = '34px sans-serif';
-    g.fillText('Карта посаженных деревьев · Караганда', 72, 118);
+    g.fillText((ECO.tr || String)('Карта посаженных деревьев · Караганда'), 72, 118);
 
     var y = 220;
     g.font = 'bold 76px sans-serif';
-    wrap(g, sp.name_ru || 'Дерево', W - 144).slice(0, 2).forEach(function (l) { g.fillText(l, 72, y); y += 88; });
+    // порода из species_note («Другая порода») — данные команды, на картинке без перевода
+    var spTitle = ECO.speciesFromNote && ECO.speciesFromNote(tree) ? sp.name_ru : (ECO.tr || String)(sp.name_ru || 'Дерево');
+    wrap(g, spTitle, W - 144).slice(0, 2).forEach(function (l) { g.fillText(l, 72, y); y += 88; });
     g.font = 'bold 60px sans-serif';
-    g.fillText('Дерево ' + tree.id, 72, y + 8);
+    g.fillText((ECO.tr || String)('Дерево ' + tree.id), 72, y + 8);
     y += 100;
     g.font = '46px sans-serif';
-    g.fillText('Я слежу за этим деревом', 72, y);
+    g.fillText((ECO.tr || String)('Я слежу за этим деревом'), 72, y);
     y += 64;
     g.font = '36px sans-serif';
-    g.fillText('Состояние: ' + ECO.statusLabel(tree.status), 72, y);
+    g.fillText((ECO.tr || String)('Состояние: ' + ECO.statusLabel(tree.status)), 72, y);
 
     var qrSize = 520;
     var qx = (W - qrSize) / 2, qy = 640;
@@ -89,7 +91,7 @@
       qrSize = size;
       g.fillStyle = '#ffffff';
       g.font = '32px sans-serif';
-      g.fillText('Наведите камеру — откроется паспорт дерева', 72, qy + qrSize + 28);
+      g.fillText((ECO.tr || String)('Наведите камеру — откроется паспорт дерева'), 72, qy + qrSize + 28);
     }
     g.font = '30px sans-serif';
     var host = (ECO.siteBaseUrl() || '').replace(/^https:\/\//, '');

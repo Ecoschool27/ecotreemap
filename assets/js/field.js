@@ -11,6 +11,10 @@
   if (typeof ECO.spName !== 'function') ECO.spName = function (sp) { return sp ? sp.name_ru : ''; };
   if (typeof ECO.lastWatered !== 'function') ECO.lastWatered = function () { return null; };
   if (typeof ECO.sentence !== 'function') ECO.sentence = function (s) { return String(s); };
+  if (typeof ECO.speciesFromNote !== 'function') ECO.speciesFromNote = function () { return false; };
+  if (typeof ECO.tData !== 'function') ECO.tData = function (k, ru, p) {
+    return [ru.replace(/\{([a-z0-9]+)\}/gi, function (a, n) { var v = p && p[n]; return v == null ? a : v.nodeType ? v.textContent : String(v); })];
+  };
   var el = ECO.el;
   var L = window.L;
   var STORE = window.ECO_FIELD_STORE;
@@ -280,10 +284,16 @@
       if (!t) { f.textContent = k === 'inspect' ? 'Дерево не выбрано.' : ''; return; }
       var sp = ECO.speciesOf(data, t);
       var lw = k === 'inspect' ? ECO.lastWatered(t) : null;
-      f.textContent = ECO.sentence('Дерево ' + t.id + ': ' + sp.name_ru + ', посажено ' +
-        (ECO.formatDate(t.planted_date) || (t.planted_year ? t.planted_year + ' г.' : 'год не указан'))) +
-        (k === 'place_existing' ? ' Порода и год берутся из реестра и не меняются.' : '') +
-        (lw ? ' Последний полив: ' + ECO.sentence(ECO.formatDate(lw)) : '');
+      // порода из species_note («Другая порода») — данные команды, не переводится; остальное — интерфейс
+      var planted = ECO.formatDate(t.planted_date) || (t.planted_year ? t.planted_year + ' г.' : 'год не указан');
+      var txt = function (s) { return document.createTextNode(s); };
+      var parts = ECO.tData('field.tree_info', 'Дерево {id}: {name}, посажено {date}',
+        { id: txt(t.id), name: ECO.speciesFromNote(t) ? sp.name_ru : txt(sp.name_ru), date: txt(planted) });
+      if (!/[.!?…]$/.test(planted)) parts.push('.');
+      if (k === 'place_existing') parts.push(' Порода и год берутся из реестра и не меняются.');
+      if (lw) parts.push(' Последний полив: ' + ECO.sentence(ECO.formatDate(lw)));
+      ECO.clear(f);
+      parts.forEach(function (x) { f.appendChild(typeof x === 'string' ? txt(x) : x); });
     }
     Array.prototype.forEach.call(document.querySelectorAll('input[name="kind"]'), function (r) {
       r.addEventListener('change', updateKind);
@@ -476,7 +486,7 @@
     $('gps-start').addEventListener('click', startGps);
     $('gps-fix').addEventListener('click', function () { fixGps(false); });
     $('gps-force').addEventListener('click', function () {
-      if (window.confirm('Точность GPS хуже ±' + THRESHOLD + ' м — точка может оказаться у соседнего дерева. Зафиксировать всё равно?')) fixGps(true);
+      if (window.confirm((ECO.tr || String)('Точность GPS хуже ±' + THRESHOLD + ' м — точка может оказаться у соседнего дерева. Зафиксировать всё равно?'))) fixGps(true);
     });
     if (!geoOk) {
       var sb = $('secure-banner');
@@ -495,7 +505,8 @@
     selEvent.appendChild(el('option', { value: EVENT_NONE, text: '— уточняется —' }));
     var events = [];
     trees.forEach(function (t) { if (t.event && events.indexOf(t.event) === -1) events.push(String(t.event)); });
-    events.forEach(function (e) { selEvent.appendChild(el('option', { value: e, text: e })); });
+    // названия акций — данные: не переводятся при выводе на kk (i18n.js пропускает узлы с data-i18n-skip)
+    events.forEach(function (e) { selEvent.appendChild(el('option', { value: e, text: e, attrs: { 'data-i18n-skip': '' } })); });
     selEvent.appendChild(el('option', { value: EVENT_CUSTOM, text: 'другая акция (ввести)…' }));
     selEvent.addEventListener('change', function () { $('box-event-custom').hidden = selEvent.value !== EVENT_CUSTOM; });
     $('f-observed').value = todayIso();

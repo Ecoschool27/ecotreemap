@@ -57,7 +57,11 @@
     $('acc-moderate').hidden = !staff;
     var show = ['acc-profile'];
     if (p.team) {
+      // название команды и школа — данные: перевод на выводе (i18n.js) их не трогает; «не указана» — интерфейс
+      $('team-name').setAttribute('data-i18n-skip', '');
       $('team-name').textContent = p.team.name;
+      if (p.team.school) $('team-school').setAttribute('data-i18n-skip', '');
+      else $('team-school').removeAttribute('data-i18n-skip');
       $('team-school').textContent = p.team.school || 'не указана';
       $('team-status').textContent = DB.TEAM_STATUS[p.team.status] || 'неизвестен';
       $('team-status').setAttribute('data-status', p.team.status);

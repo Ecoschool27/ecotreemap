@@ -36,9 +36,11 @@
     var ordered = planted.concat(keys.filter(function (key) { return !groups[key].length; }));
 
     content.appendChild(el('p', {
-      text: t('species.intro_planted', 'В проекте посажено') + ' ' + data.trees.length + ' ' + ECO.treesWord(data.trees.length) +
-        ' ' + planted.length + ' ' + ECO.plural(planted.length, ['породы', 'пород', 'пород']) + '. ' +
-        t('species.intro_list', 'В справочнике — породы, типичные для озеленения Караганды') + ': ' + keys.length + '.'
+      text: t('species.intro', 'В проекте посажено {n} {treesWord} {n2} {kindsWord}. ' +
+        'В справочнике — породы, типичные для озеленения Караганды: {n3}.', {
+        n: data.trees.length, treesWord: ECO.treesWord(data.trees.length),
+        n2: planted.length, kindsWord: ECO.plural(planted.length, ['породы', 'пород', 'пород']), n3: keys.length
+      })
     }));
     content.appendChild(el('p', {
       className: 'muted',
@@ -125,7 +127,7 @@
             href: '../index.html?species=' + encodeURIComponent(key),
             className: 'btn btn--outline',
             text: t('species.on_map_btn', 'Эта порода на карте'),
-            attrs: { 'aria-label': t('species.on_map_aria', 'Показать на карте только породу') + ' «' + sp.name_ru + '»' }
+            attrs: { 'aria-label': t('species.on_map_aria', 'Показать на карте только породу') + ' «' + (ECO.tr || String)(sp.name_ru) + '»' }
           })
         ]) : null
       ]);

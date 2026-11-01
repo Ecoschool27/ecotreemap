@@ -10,6 +10,8 @@
   if (!ECO || !ECO.DB) return; // нет common.js/db.js — страховка в moderate.html покажет причину
   var DB = ECO.DB;
   var el = ECO.el;
+  // Страховка от смешения версий в кэше браузера (этот файл новее common.js).
+  if (typeof ECO.dataSpan !== 'function') ECO.dataSpan = function (s, c) { return el('span', { className: c, text: String(s), attrs: { 'data-i18n-skip': '' } }); };
 
   var PENDING_BUCKET = 'photos-pending';
   var PUBLIC_BUCKET = DB.PUBLIC_BUCKET || 'photos-public';
@@ -91,6 +93,18 @@
   }
   function teamName(id) {
     return id && own(teams, id) ? '«' + teams[id].name + '»' : (id ? 'команда удалена' : 'без команды (исторический)');
+  }
+  // Строка «Команда: «…» · <хвост>»: название команды — данные (без перевода), подписи — интерфейс.
+  function teamLine(id, tail) {
+    return el('p', { className: 'mod-team' }, [
+      'Команда: ',
+      id && own(teams, id) ? ECO.dataSpan(teamName(id)) : teamName(id),
+      tail
+    ]);
+  }
+  // «Подпись: значение из данных» — значение не переводится.
+  function dataLine(label, value, className) {
+    return el('p', { className: className }, [label, ECO.dataSpan(value)]);
   }
   function client() { return DB.session(); }
 
@@ -210,9 +224,12 @@
       var item = itemNode(id);
       item.setAttribute('data-status', t.status);
       var msg = itemMsg();
-      item.appendChild(el('h3', { className: 'mod-team-name', text: t.name }));
-      item.appendChild(el('p', { text: 'Статус: ' + (DB.TEAM_STATUS[t.status] || t.status) + ' · заявка от ' + day(t.created_at) +
-        (t.school ? ' · школа: ' + t.school : '') }));
+      item.appendChild(el('h3', { className: 'mod-team-name', text: t.name, attrs: { 'data-i18n-skip': '' } }));
+      item.appendChild(el('p', null, [
+        'Статус: ' + (DB.TEAM_STATUS[t.status] || t.status) + ' · заявка от ' + day(t.created_at),
+        t.school ? ' · школа: ' : null,
+        t.school ? ECO.dataSpan(t.school, 'mod-school') : null
+      ]));
       var actions = el('p', { className: 'acc-actions' });
       if (t.status === 'pending' || t.status === 'suspended') {
         var code = el('input', { type: 'text', className: 'mod-code', attrs: {
@@ -296,7 +313,13 @@
         : 'Место для существующего дерева ' + (p.tree_id || '') }));
       var sp = p.species && own(species, p.species) ? species[p.species] : (p.species || '');
       if (sp || p.species_note) {
-        item.appendChild(el('p', { className: 'mod-species', text: 'Порода: ' + (sp || '—') + (p.species_note ? ' (' + p.species_note + ')' : '') }));
+        // предложенная порода (species_note) — данные команды; название из справочника — интерфейс
+        item.appendChild(el('p', { className: 'mod-species' }, [
+          'Порода: ' + (sp || '—'),
+          p.species_note ? ' (' : null,
+          p.species_note ? ECO.dataSpan(p.species_note) : null,
+          p.species_note ? ')' : null
+        ]));
       }
       var coords = el('p', null, ['Координаты: ']);
       var link = mapLink(p.lat, p.lon);
@@ -310,12 +333,12 @@
         coords.appendChild(el('a', { href: 'tree.html?id=' + encodeURIComponent(p.tree_id), text: 'паспорт дерева' }));
       }
       item.appendChild(coords);
-      item.appendChild(el('p', { className: 'mod-team', text: 'Команда: ' + teamName(p.team_id) + ' · отправлено ' + day(p.created_at) }));
+      item.appendChild(teamLine(p.team_id, ' · отправлено ' + day(p.created_at)));
       if (p.planted_date || p.planted_year) {
         item.appendChild(el('p', { text: 'Посадка: ' + (ECO.formatDate(p.planted_date) || String(p.planted_year)) }));
       }
-      if (p.event) item.appendChild(el('p', { text: 'Акция: ' + p.event }));
-      if (p.notes) item.appendChild(el('p', { className: 'mod-notes', text: 'Заметка: ' + p.notes }));
+      if (p.event) item.appendChild(dataLine('Акция: ', p.event, 'mod-event'));
+      if (p.notes) item.appendChild(dataLine('Заметка: ', p.notes, 'mod-notes'));
       var actions = el('p', { className: 'acc-actions' });
       var finalId = el('input', { type: 'text', className: 'mod-final', value: (isNew ? p.proposed_id : p.tree_id) || '',
         attrs: { maxlength: '9', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Номер дерева после подтверждения' } });
@@ -523,7 +546,7 @@
       var msg = itemMsg();
       var target = r.tree_id ? 'дерево ' + r.tree_id : 'предложение нового дерева';
       item.appendChild(el('h3', { text: 'Фото: ' + target + (r.observation_id ? ' (к осмотру)' : '') }));
-      item.appendChild(el('p', { className: 'mod-team', text: 'Команда: ' + teamName(r.team_id) + ' · отправлено ' + day(r.created_at) }));
+      item.appendChild(teamLine(r.team_id, ' · отправлено ' + day(r.created_at)));
       var actions = el('p', { className: 'acc-actions' });
       if (r.status === 'pending') {
         var fig = el('p', { className: 'mod-photo' });
@@ -589,10 +612,12 @@
         head.appendChild(document.createTextNode('Опека дерева '));
         head.appendChild(el('a', { href: 'tree.html?id=' + encodeURIComponent(p.tree_id), text: p.tree_id }));
       } else {
-        head.textContent = 'Опека группы «' + (own(groups, p.group_id) ? groups[p.group_id] : 'группа') + '»';
+        head.appendChild(document.createTextNode('Опека группы «'));
+        head.appendChild(own(groups, p.group_id) ? ECO.dataSpan(groups[p.group_id], 'mod-group') : document.createTextNode('группа'));
+        head.appendChild(document.createTextNode('»'));
       }
       item.appendChild(head);
-      item.appendChild(el('p', { className: 'mod-team', text: 'Команда: ' + teamName(p.team_id) + ' · заявка от ' + day(p.requested_at) }));
+      item.appendChild(teamLine(p.team_id, ' · заявка от ' + day(p.requested_at)));
       var reload = function () { return guard('list-patronage', loadPatronage); };
       item.appendChild(el('p', { className: 'acc-actions' }, [
         btn('Одобрить', 'btn--primary mod-approve', function () {
@@ -633,8 +658,8 @@
       var parts = [o.status ? ECO.statusLabel(o.status) : 'состояние не указано'];
       if (o.watered === true) parts.push('полито');
       item.appendChild(el('p', { text: parts.join('; ') }));
-      if (o.notes) item.appendChild(el('p', { className: 'mod-notes', text: 'Заметка: ' + o.notes }));
-      item.appendChild(el('p', { className: 'mod-team', text: 'Команда: ' + teamName(o.team_id) + ' · отправлено ' + day(o.created_at) }));
+      if (o.notes) item.appendChild(dataLine('Заметка: ', o.notes, 'mod-notes'));
+      item.appendChild(teamLine(o.team_id, ' · отправлено ' + day(o.created_at)));
       var reload = function () { return guard('list-observations', loadObservations); };
       item.appendChild(el('p', { className: 'acc-actions' }, [
         o.visible ? btn('Скрыть', 'btn--outline mod-hide', function () {

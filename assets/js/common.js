@@ -36,6 +36,32 @@
     return node;
   };
 
+  // ---------- данные пользователей не переводятся ----------
+  // Значение из данных (заметка, название команды/группы/акции, порода «Другая», автор фото) — в <span
+  // data-i18n-skip>: перевод на выводе (i18n.js) такие узлы не трогает, даже если текст совпал с фразой словаря.
+  ECO.dataSpan = function (text, className) {
+    return ECO.el('span', { className: className, text: String(text), attrs: { 'data-i18n-skip': '' } });
+  };
+  // Строка интерфейса со вставками данных: шаблон берётся уже на языке страницы (ECO.t из i18n.js; без него —
+  // русский), {имя} заменяются узлами. Значение-строка — данные (ECO.dataSpan), значение-узел вставляется как
+  // есть (например, текстовый узел с датой — его переведёт i18n.js). Возвращает список детей для ECO.el.
+  ECO.tData = function (key, ru, params) {
+    var s = typeof ECO.t === 'function' ? ECO.t(key, ru) : ru;
+    var out = [];
+    var re = /\{([a-z0-9]+)\}/gi;
+    var last = 0;
+    var m;
+    while ((m = re.exec(s))) {
+      if (m.index > last) out.push(s.slice(last, m.index));
+      var v = params && Object.prototype.hasOwnProperty.call(params, m[1]) ? params[m[1]] : null;
+      if (v === null || v === undefined) out.push(m[0]);
+      else out.push(typeof v === 'object' && v.nodeType ? v : ECO.dataSpan(v));
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) out.push(s.slice(last));
+    return out;
+  };
+
   // Ссылки из данных (источники фото и т.п.) — только http/https, иначе null.
   ECO.safeUrl = function (url) {
     if (typeof url !== 'string' || !url) return null;
@@ -290,6 +316,7 @@
     if (!Array.isArray(trees)) errors.push('Не загрузился файл data/trees.js (список деревьев).');
     if (!species || typeof species !== 'object') errors.push('Не загрузился файл data/species.js (справочник пород).');
     if (errors.length) return { ok: false, trees: [], species: {}, errors: errors, warnings: warnings };
+    if (ECO.i18n && ECO.i18n.registerSpecies) ECO.i18n.registerSpecies(species); // казахские названия пород по ключу
 
     var seen = Object.create(null);
     var clean = [];
@@ -352,6 +379,14 @@
       }
     );
   };
+  // Название породы взято из species_note дерева (данные команды, не словарь) — не переводить.
+  ECO.speciesFromNote = function (tree) {
+    return !!tree && tree.species === 'other' && !!ECO.speciesNote(tree);
+  };
+  // Название породы для вывода: из species_note — узел без перевода, иначе строка (переводится по словарю).
+  ECO.speciesNameNode = function (tree, sp, className) {
+    return ECO.speciesFromNote(tree) ? ECO.dataSpan(sp.name_ru, className) : sp.name_ru;
+  };
 
   ECO.byId = function (data, id) {
     for (var i = 0; i < data.trees.length; i++) if (data.trees[i].id === id) return data.trees[i];
@@ -386,7 +421,9 @@
     var caption = ECO.el('figcaption', { className: 'photo-credit' }, [
       src.note ? ECO.el('span', { className: 'photo-note', text: String(src.note) }) : null,
       src.note ? ECO.el('br') : null,
-      'Фото: ' + String(src.author) + '. Лицензия: ',
+      'Фото: ',
+      ECO.dataSpan(src.author),
+      '. Лицензия: ',
       licenseUrl
         ? ECO.el('a', { href: licenseUrl, text: license, attrs: { target: '_blank', rel: 'noopener' } })
         : license,
@@ -449,7 +486,11 @@
     var credit = typeof cfg.TREE_PHOTO_CREDIT === 'string' && cfg.TREE_PHOTO_CREDIT.trim()
       ? cfg.TREE_PHOTO_CREDIT.trim() : 'Фото: участники проекта EcoTreeMap';
     var date = ECO.formatDate(t.photo_date);
-    var img = ECO.el('img', { attrs: { src: imagesPrefix + path, alt: 'Дерево ' + t.id + ' (' + sp.name_ru + ')', loading: 'lazy' } });
+    // порода из species_note (данные) — подпись собирается уже на языке страницы и не переводится повторно
+    var fromNote = ECO.speciesFromNote(t);
+    var alt = fromNote && ECO.i18n && typeof ECO.t === 'function' ? ECO.t('common.tree_alt', 'Дерево {id} ({name})', { id: t.id, name: sp.name_ru })
+      : 'Дерево ' + t.id + ' (' + sp.name_ru + ')';
+    var img = ECO.el('img', { attrs: { src: imagesPrefix + path, alt: alt, loading: 'lazy', 'data-i18n-skip': fromNote ? '' : null } });
     var fig = ECO.el('figure', { className: 'photo photo--tree', style: 'margin:0' }, [
       img,
       ECO.el('figcaption', { className: 'photo-credit', text: 'Фото дерева' + (date ? ', ' + date : '') + '; ' + credit })

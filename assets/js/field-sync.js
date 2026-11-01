@@ -588,7 +588,8 @@
         el('a', { href: '../pages/account.html', text: 'аккаунта' }), '. Пока записи сохраняются только на телефоне.'];
     }
     var st = (ECO.DB && ECO.DB.TEAM_STATUS && ECO.hasOwn(ECO.DB.TEAM_STATUS, id.status)) ? ECO.DB.TEAM_STATUS[id.status] : id.status;
-    var out = ['Команда «', el('b', { text: id.teamName }), '» — ' + st + '. '];
+    // название команды — данные (без перевода), подписи вокруг — интерфейс
+    var out = ['Команда «', el('b', { text: id.teamName, attrs: { 'data-i18n-skip': '' } }), '» — ' + st + '. '];
     if (id.status === 'approved') out.push('Новые записи отправляются в онлайн-базу, когда есть связь.');
     else out.push('Пока команда не подтверждена, записи сохраняются только на телефоне (и в выгрузке JSON).');
     if (S.mode === 'cached') out.push(' Нет связи с базой — данные о команде с прошлого входа.');
@@ -640,7 +641,15 @@
     var adopt = $('sync-adopt');
     if (adopt) {
       adopt.hidden = !(approved() && S.counts.noTeam + S.counts.other > 0);
-      adopt.textContent = approved() ? 'Отправить от имени «' + S.identity.teamName + '»' : '';
+      ECO.clear(adopt);
+      if (approved()) {
+        // Подпись уже на языке страницы (ECO.t подставляет название команды как есть, без перевода) — одним
+        // узлом с data-i18n-skip, чтобы перевод на выводе не тронул название; один узел — кнопка (flex) не
+        // разбивает подпись на строки.
+        var label = ECO.i18n && typeof ECO.t === 'function' ? ECO.t('sync.adopt', 'Отправить от имени «{x}»', { x: S.identity.teamName })
+          : 'Отправить от имени «' + S.identity.teamName + '»';
+        adopt.appendChild(el('span', { text: label, attrs: { 'data-i18n-skip': '' } }));
+      }
       adopt.disabled = S.running;
     }
     var card = $('sync-card');
@@ -660,9 +669,17 @@
       var what = [];
       if (noTeam) what.push('сделанные без входа — ' + noTeam + ' шт.');
       if (other) what.push('помеченные другой командой — ' + other + ' шт.');
-      var ok = window.confirm('Отправить от имени команды «' + id.teamName + '» записи на этом телефоне (' + what.join('; ') +
-        ')? Они появятся на сайте от вашей команды. ' +
-        'Если эти записи уже переданы координатору файлом JSON — нажмите «Отмена», иначе на сайте будут повторы.');
+      // Текст подтверждения — на языке страницы; название команды подставляется без перевода (ECO.t не
+      // переводит параметры), перечень записей — интерфейс (ECO.tr). Подпись кнопки отмены задаёт браузер на
+      // своём языке — текст на неё не ссылается.
+      var tr = ECO.tr || String;
+      var t = ECO.i18n && typeof ECO.t === 'function' ? ECO.t : function (k, ru, p) {
+        return ru.replace(/\{([a-z0-9]+)\}/gi, function (all, n) { return p && ECO.hasOwn(p, n) ? String(p[n]) : all; });
+      };
+      var ok = window.confirm(t('sync.adopt_q', 'Отправить от имени команды «{x}» записи на этом телефоне ({what})?',
+        { x: id.teamName, what: tr(what.join('; ')) }) + ' ' +
+        t('sync.adopt_appear', 'Они появятся на сайте от вашей команды.') + ' ' +
+        t('sync.adopt_dup', 'Если эти записи уже переданы координатору файлом JSON — откажитесь в этом окне, иначе на сайте будут повторы.'));
       if (!ok) return 0;
       return orphans.reduce(function (p, r) {
         return p.then(function () {

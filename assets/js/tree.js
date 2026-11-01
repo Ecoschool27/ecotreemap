@@ -10,6 +10,12 @@
   if (typeof ECO.obsPhotoPath !== 'function') ECO.obsPhotoPath = function () { return null; };
   if (typeof ECO.patronOf !== 'function') ECO.patronOf = function () { return ''; };
   if (typeof ECO.photoHistory !== 'function') ECO.photoHistory = function () { return []; };
+  if (typeof ECO.dataSpan !== 'function') ECO.dataSpan = function (s, c) { return ECO.el('span', { className: c, text: String(s), attrs: { 'data-i18n-skip': '' } }); };
+  if (typeof ECO.speciesFromNote !== 'function') ECO.speciesFromNote = function () { return false; };
+  if (typeof ECO.speciesNameNode !== 'function') ECO.speciesNameNode = function (t, sp) { return sp.name_ru; };
+  if (typeof ECO.tData !== 'function') ECO.tData = function (k, ru, p) {
+    return [ru.replace(/\{([a-z0-9]+)\}/gi, function (a, n) { var v = p && p[n]; return v == null ? a : v.nodeType ? v.textContent : String(v); })];
+  };
   var el = ECO.el;
 
   function notFound(title, text) {
@@ -89,20 +95,21 @@
     }
     function render(row) {
       ECO.clear(body);
-      var team = '«' + profile.team.name + '»';
+      // название команды — данные: отдельным узлом без перевода (ECO.tData), текст вокруг — на языке страницы
+      var team = function () { return el('span', null, ['«', ECO.dataSpan(profile.team.name), '»']); };
       if (row && row.status === 'approved') {
-        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'approved' },
-          text: 'Ваша команда ' + team + ' опекает это дерево.' }));
+        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'approved' } },
+          ECO.tData('tree.pat_yours', 'Ваша команда {x} опекает это дерево.', { x: team() })));
       } else if (row) {
-        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'pending' },
-          text: 'Заявка команды ' + team + ' на опеку ждёт модератора.' }));
+        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'pending' } },
+          ECO.tData('tree.pat_pending', 'Заявка команды {x} на опеку ждёт модератора.', { x: team() })));
       } else if (ECO.patronOf(tree)) {
         box.hidden = true; // у дерева уже есть шеф — кнопки нет
         return;
       } else {
-        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'none' },
-          text: 'Команда ' + team + ' может взять это дерево под опеку: поливать, осматривать и отмечать состояние. ' +
-            'Заявку подтверждает модератор.' }));
+        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'none' } },
+          ECO.tData('tree.pat_can', 'Команда {x} может взять это дерево под опеку: поливать, осматривать и отмечать состояние.',
+            { x: team() }).concat([' Заявку подтверждает модератор.'])));
         body.appendChild(el('p', { className: 'acc-actions' }, [
           button('patronage-take', 'Взять под опеку', 'btn--primary', function () {
             return DB.session().from('patronage').insert({ tree_id: tree.id, status: 'pending' }).then(function (res) {
@@ -116,8 +123,8 @@
       }
       body.appendChild(el('p', { className: 'acc-actions' }, [
         button('patronage-end', row.status === 'approved' ? 'Отказаться от опеки' : 'Отозвать заявку', 'btn--outline', function () {
-          if (!window.confirm(row.status === 'approved' ? 'Отказаться от опеки дерева ' + tree.id + '?'
-            : 'Отозвать заявку на опеку дерева ' + tree.id + '?')) return null;
+          if (!window.confirm((ECO.tr || String)(row.status === 'approved' ? 'Отказаться от опеки дерева ' + tree.id + '?'
+            : 'Отозвать заявку на опеку дерева ' + tree.id + '?'))) return null;
           var was = row.status;
           return DB.session().from('patronage').update({ status: 'ended' }).eq('id', row.id).then(function (res) {
             if (res.error) throw res.error;
@@ -190,12 +197,12 @@
 
     // ----- основная карточка -----
     var dl = el('dl', { className: 'facts' });
-    fact(dl, 'Порода', el('a', { href: 'species.html#' + encodeURIComponent(tree.species), text: sp.name_ru }));
+    fact(dl, 'Порода', el('a', { href: 'species.html#' + encodeURIComponent(tree.species) }, [ECO.speciesNameNode(tree, sp)]));
     var plantedDate = ECO.formatDate(tree.planted_date);
     if (plantedDate) fact(dl, 'Дата посадки', plantedDate);
     else fact(dl, 'Год посадки', String(tree.planted_year));
     fact(dl, 'Лет с посадки', ECO.yearsSincePlanting(tree.planted_year, null, tree.planted_date));
-    fact(dl, 'Акция', tree.event ? String(tree.event) : 'уточняется');
+    fact(dl, 'Акция', tree.event ? ECO.dataSpan(tree.event) : 'уточняется');
     var statusDate = tree.status ? ECO.formatDate(tree.status_date) : null;
     fact(dl, 'Состояние', ECO.statusLabel(tree.status) + (statusDate ? ' (осмотр ' + statusDate + ')' : ''));
     var lastWater = ECO.lastWatered(tree);
@@ -204,7 +211,10 @@
     var patron = ECO.patronOf(tree);
     if (patron) {
       var since = ECO.formatDate(tree.patron_since);
-      fact(dl, 'Шефство', 'Под опекой: ' + patron + (since ? ' (с ' + since + ')' : ''));
+      // шеф — название команды/группы (данные), дата — интерфейс (переводится как текстовый узел)
+      fact(dl, 'Шефство', el('span', null, since
+        ? ECO.tData('tree.patron_since', 'Под опекой: {x} (с {date})', { x: patron, date: document.createTextNode(since) })
+        : ECO.tData('map.popup_patron', 'Под опекой: {x}', { x: patron })));
     } else {
       fact(dl, 'Шефство', el('span', null, [
         'Ищет опекуна — ',
@@ -230,13 +240,13 @@
     var main = el('section', { className: 'card' }, [
       el('h1', { text: 'Дерево ' + tree.id }),
       el('p', { style: 'margin:0' }, [
-        el('span', { className: 'chip', style: 'background:' + sp.color, text: sp.name_ru }),
+        el('span', { className: 'chip', style: 'background:' + sp.color }, [ECO.speciesNameNode(tree, sp)]),
         sp.name_lat ? ' ' : '',
         sp.name_lat ? el('i', { text: sp.name_lat }) : ''
       ]),
       dl
     ]);
-    if (tree.notes) main.appendChild(el('p', { className: 'note', text: String(tree.notes) }));
+    if (tree.notes) main.appendChild(el('p', { className: 'note', text: String(tree.notes), attrs: { 'data-i18n-skip': '' } }));
     content.appendChild(main);
     var patBox = patronageBox(tree, data);
     if (patBox) content.appendChild(patBox);
@@ -300,20 +310,38 @@
     obs.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
     if (obs.length) {
       var ol = el('ul', { className: 'tree-observations' });
+      // Строка истории собирается из узлов: дата, состояние, «полито», «фото» и «(команда «…»)» — интерфейс
+      // (переводится), заметка и название команды — данные (ECO.dataSpan, без перевода).
       obs.slice(0, 10).forEach(function (o) {
-        var parts = [ECO.formatDate(o.date) + ': '];
-        parts.push(o.status ? ECO.statusLabel(o.status) : o.watered === true ? '' : 'состояние не указано');
-        if (o.watered === true) parts.push((o.status ? '; ' : '') + 'полито');
-        if (ECO.obsPhotoPath(tree, o)) parts.push('; фото');
-        if (o.notes) parts.push(' — ' + String(o.notes).slice(0, 500));
-        if (typeof o.team === 'string' && o.team) parts.push(' (команда «' + o.team.slice(0, 60) + '»)');
-        ol.appendChild(el('li', { text: parts.join('') }));
+        var li = el('li');
+        li.appendChild(el('span', { className: 'obs-date', text: ECO.formatDate(o.date) }));
+        li.appendChild(document.createTextNode(': '));
+        var what = [];
+        if (o.status) what.push(ECO.statusLabel(o.status));
+        else if (o.watered !== true) what.push('состояние не указано');
+        if (o.watered === true) what.push('полито');
+        if (ECO.obsPhotoPath(tree, o)) what.push('фото');
+        what.forEach(function (w, i) {
+          if (i) li.appendChild(document.createTextNode('; '));
+          li.appendChild(el('span', { className: 'obs-what', text: w }));
+        });
+        if (o.notes) {
+          li.appendChild(document.createTextNode(' — '));
+          li.appendChild(ECO.dataSpan(String(o.notes).slice(0, 500), 'obs-note'));
+        }
+        if (typeof o.team === 'string' && o.team) {
+          li.appendChild(document.createTextNode(' '));
+          li.appendChild(el('span', { className: 'obs-team' },
+            ECO.tData('tree.obs_team', '(команда «{x}»)', { x: ECO.dataSpan(o.team.slice(0, 60), 'obs-team-name') })));
+        }
+        ol.appendChild(li);
       });
       content.appendChild(el('section', { className: 'card' }, [el('h2', { text: 'История осмотров' }), ol]));
     }
 
     // ----- уход -----
-    var careCard = el('section', { className: 'card' }, [el('h2', { text: 'Уход за породой «' + sp.name_ru + '»' })]);
+    var careCard = el('section', { className: 'card' }, [el('h2', null, ECO.tData('tree.care', 'Уход за породой «{x}»',
+      { x: ECO.speciesFromNote(tree) ? sp.name_ru : document.createTextNode(sp.name_ru) }))]);
     if (sp.care && sp.care_source) {
       careCard.appendChild(el('p', { text: sp.care }));
       var srcUrl = ECO.safeUrl(sp.care_source);

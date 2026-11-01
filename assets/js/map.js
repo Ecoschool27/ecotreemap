@@ -9,6 +9,10 @@
   if (typeof ECO.spName !== 'function') ECO.spName = function (sp) { return sp ? sp.name_ru : ''; };
   if (typeof ECO.helpReasons !== 'function') ECO.helpReasons = function () { return { status: false, stale: false, dry: false }; };
   if (typeof ECO.patronOf !== 'function') ECO.patronOf = function () { return ''; };
+  if (typeof ECO.speciesNameNode !== 'function') ECO.speciesNameNode = function (t, sp) { return sp.name_ru; };
+  if (typeof ECO.tData !== 'function') ECO.tData = function (k, ru, p) {
+    return [ru.replace(/\{([a-z0-9]+)\}/gi, function (a, n) { var v = p && p[n]; return v == null ? a : v.nodeType ? v.textContent : String(v); })];
+  };
   ECO.needsCluster = true;
 
   var params = new URLSearchParams(window.location.search);
@@ -170,11 +174,12 @@
       marker.bindPopup(function () {
         return ECO.el('div', { className: 'popup' }, [
           ECO.el('h3', { text: 'Дерево ' + t.id }),
-          ECO.el('p', { text: sp.name_ru + (sp.name_lat ? ' (' + sp.name_lat + ')' : '') }),
+          // порода из species_note, акция и шеф — данные (без перевода); подписи — интерфейс
+          ECO.el('p', null, [ECO.speciesNameNode(t, sp), sp.name_lat ? ' (' + sp.name_lat + ')' : null]),
           ECO.el('p', { text: 'Посажено: ' + (ECO.formatDate(t.planted_date) || t.planted_year + ' г.') }),
           ECO.el('p', { text: 'Лет с посадки: ' + ECO.yearsSincePlanting(t.planted_year, null, t.planted_date) }),
-          t.event ? ECO.el('p', { text: 'Акция: ' + t.event }) : null,
-          ECO.el('p', { text: ECO.patronOf(t) ? 'Под опекой: ' + ECO.patronOf(t) : 'Ищет опекуна' }),
+          t.event ? ECO.el('p', null, ECO.tData('map.popup_event', 'Акция: {x}', { x: String(t.event) })) : null,
+          ECO.el('p', null, ECO.patronOf(t) ? ECO.tData('map.popup_patron', 'Под опекой: {x}', { x: ECO.patronOf(t) }) : ['Ищет опекуна']),
           ECO.el('a', { href: passportHref(t.id), text: 'Открыть паспорт дерева →' })
         ]);
       });

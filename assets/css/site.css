@@ -100,6 +100,34 @@ h3 {
   text-underline-offset: 3px;
 }
 
+/* Переключатель языка RU | ҚАЗ (добавляет assets/js/i18n.js) */
+.site-header nav .lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+.lang-switch .lang-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 8px;
+  border: 1px solid #fff;
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lang-switch .lang-btn[aria-pressed="true"] {
+  background: #fff;
+  color: var(--green-dark);
+}
+.lang-switch .lang-btn:focus-visible {
+  outline: 3px solid #ffd54f;
+  outline-offset: 2px;
+}
+
 /* ---------- кнопки и формы ---------- */
 .btn {
   display: inline-flex;
