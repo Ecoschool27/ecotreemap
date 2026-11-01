@@ -7,7 +7,7 @@
 <link rel="icon" href="data:,">
 <title>Полевой режим — EcoTreeMap</title>
 <link rel="stylesheet" href="../assets/lib/leaflet/leaflet.css?v=a7837102">
-<link rel="stylesheet" href="../assets/css/site.css?v=b251a9ba">
+<link rel="stylesheet" href="../assets/css/site.css?v=902d00c6">
 </head>
 <body class="page-field">
 <header class="site-header">
@@ -18,6 +18,8 @@
   <nav aria-label="Разделы сайта">
     <a href="editor.html">Редактор</a>
     <a href="../index.html">Карта сайта</a>
+    <a href="../pages/privacy.html">Приватность</a>
+    <a href="../pages/account.html">Аккаунт</a>
   </nav>
 </header>
 <div id="fatal" class="fatal" role="alert" hidden></div>
@@ -25,6 +27,20 @@
   <div id="pending-banner" class="note field-banner" role="status" hidden></div>
   <div id="secure-banner" class="note field-banner" role="note" hidden></div>
   <div id="qr-banner" class="note field-banner" role="note" hidden></div>
+
+  <section class="card field-sync" id="sync-card" aria-labelledby="sync-title">
+    <h2 id="sync-title">Команда и онлайн-отправка</h2>
+    <p id="sync-team" role="status" aria-live="polite">Проверяем вход команды…</p>
+    <p id="sync-queue" class="summary-line" aria-live="polite" hidden></p>
+    <p id="sync-extra" class="muted" hidden></p>
+    <p id="sync-msg" class="result result--demo" role="alert" hidden></p>
+    <div class="btn-row">
+      <button type="button" class="btn btn--primary" id="sync-now" hidden>Отправить сейчас</button>
+      <button type="button" class="btn btn--outline" id="sync-adopt" hidden></button>
+    </div>
+    <p class="muted">Вход и создание команды — на странице <a href="../pages/account.html">«Аккаунт»</a>.
+      Без входа всё работает как раньше: записи на телефоне, передача файлом JSON.</p>
+  </section>
 
   <section class="card">
     <h2>1. Что делаем</h2>
@@ -46,7 +62,7 @@
     <div id="box-new" hidden>
       <p class="summary-line" id="f-new-id" aria-live="polite"></p>
       <label for="f-year">Год посадки (обязательно)</label>
-      <input type="number" id="f-year" min="1900" step="1" inputmode="numeric">
+      <input type="number" id="f-year" min="1950" step="1" inputmode="numeric">
       <label for="f-date">Дата посадки (если известна)</label>
       <input type="date" id="f-date">
       <div id="box-species-note" hidden>
@@ -95,7 +111,7 @@
       </div>
     </div>
     <label for="f-observed">Дата осмотра</label>
-    <input type="date" id="f-observed">
+    <input type="date" id="f-observed" min="2020-01-01">
     <label for="f-notes">Заметка (до 500 знаков) — <b>будет видна всем на сайте</b></label>
     <textarea id="f-notes" rows="3" maxlength="500"></textarea>
     <label for="f-author">Кто отметил (до 60 знаков) — на сайте не публикуется</label>
@@ -128,12 +144,14 @@
       <button type="button" class="btn btn--outline" id="btn-png">Скачать PNG</button>
     </div>
     <p class="muted no-print" id="plaque-url"></p>
+    <p class="note no-print" id="plaque-provisional" role="note" hidden></p>
   </section>
 
   <section class="card">
     <h2>4. Выгрузка</h2>
     <p class="muted">Записи и фото хранятся только в этом браузере. Выгрузите файл и передайте координатору —
-      он вольёт его в сайт скриптом tools/merge_field.py. Пока вкладка открыта, интернет не нужен (кроме подложки карты).</p>
+      он вольёт его в сайт скриптом tools/merge_field.py. Пока вкладка открыта, интернет не нужен (кроме подложки карты).
+      «Выгрузить новые» не включает записи, уже отправленные в онлайн-базу; «Выгрузить всё» — резервная копия всех записей.</p>
     <div class="btn-row">
       <button type="button" class="btn btn--primary" id="btn-export">Выгрузить новые</button>
       <button type="button" class="btn btn--outline" id="btn-export-all">Выгрузить всё</button>
@@ -149,24 +167,35 @@
     <h3>Записи на этом телефоне</h3>
     <ul id="records-list" class="field-records"></ul>
   </section>
+  <p id="data-source" class="data-source" hidden></p>
 </main>
 <noscript><p class="fatal">Для полевого режима нужен JavaScript.</p></noscript>
 
-<script src="../assets/js/config.js?v=acde99e3"></script>
+<script src="../assets/js/config.js?v=7d3d018b"></script>
 <script src="../data/species.js?v=87965e18"></script>
 <script src="../data/trees.js?v=e7938355"></script>
 <script src="../assets/lib/leaflet/leaflet.js?v=db49d009"></script>
 <script src="../assets/lib/qrcode-generator/qrcode.js?v=79ec86f8"></script>
-<script src="../assets/js/common.js?v=6d6cdff5"></script>
-<script src="../assets/js/field-store.js?v=8e4caa31"></script>
-<script src="../assets/js/field.js?v=3fb60b31"></script>
+<script src="../assets/lib/supabase/supabase.js?v=ee3be8de"></script>
+<script src="../assets/js/common.js?v=f7eb484c"></script>
+<script src="../assets/js/db.js?v=c7d80ee4"></script>
+<script src="../assets/js/field-store.js?v=90f33c63"></script>
+<script src="../assets/js/field-sync.js?v=7c4a6d6a"></script>
+<script src="../assets/js/field.js?v=09e29004"></script>
 <script>
-  window.addEventListener('load', function () {
-    if (window.ECO_PAGE_DONE || window.ECO_FIELD) return; // ECO_FIELD ставится сразу, хранилище браузера открывается позже
-    var box = document.getElementById('fatal');
-    box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Откройте полевой режим из полной копии сайта.';
-    box.hidden = false;
-  });
+  (function () {
+    // Список деревьев грузится асинхронно (window.ECO_PAGE_PENDING): проверяем после загрузки, а не на событии load.
+    window.addEventListener('load', function () {
+      var pending = window.ECO_PAGE_PENDING;
+      if (pending && typeof pending.then === 'function') pending.then(check, check); else check();
+    });
+    function check() {
+      if (window.ECO_PAGE_DONE || window.ECO_FIELD) return; // ECO_FIELD ставится сразу, хранилище браузера открывается позже
+      var box = document.getElementById('fatal');
+      box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Откройте полевой режим из полной копии сайта.';
+      box.hidden = false;
+    }
+  })();
 </script>
 </body>
 </html>

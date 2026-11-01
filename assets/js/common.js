@@ -203,12 +203,90 @@
     );
   };
 
-  // Проверяет data/trees.js и data/species.js. Возвращает {ok, trees, species, errors, warnings}.
+  // Проверяет data/trees.js и data/species.js (снимок). Синхронно; так работают редактор и откат.
+  // Возвращает {ok, trees, species, errors, warnings, source: 'static', snapshotDate}.
   ECO.loadData = function () {
+    var d = ECO.validateData(window.ECO_TREES, window.ECO_SPECIES, 'static');
+    d.source = 'static';
+    d.snapshotDate = d.ok ? ECO.snapshotDate(d.trees) : null;
+    return d;
+  };
+
+  // Дата снимка: window.ECO_TREES_DATE (если задана выгрузкой), иначе самая поздняя дата в данных.
+  ECO.snapshotDate = function (trees) {
+    if (ECO.parseDate(window.ECO_TREES_DATE)) return window.ECO_TREES_DATE;
+    var best = null;
+    function take(d) { if (ECO.parseDate(d) && (!best || d > best)) best = d; }
+    (trees || []).forEach(function (t) {
+      if (!t) return;
+      take(t.planted_date); take(t.status_date); take(t.photo_date); take(t.patron_since);
+      ECO.validObservations(t).forEach(function (o) { take(o.date); });
+    });
+    return best;
+  };
+
+  // Асинхронная загрузка для публичных страниц: онлайн-база (assets/js/db.js), а при любом сбое,
+  // отказе или таймауте — целиком снимок data/*.js (без смешивания источников). Промис не отклоняется.
+  ECO.loadDataAsync = function () {
+    function fallback(reason) {
+      var d = ECO.loadData();
+      if (reason && window.console) console.warn('[EcoTreeMap] онлайн-база не используется: ' + reason + ' — данные из снимка.');
+      return d;
+    }
+    var DB = ECO.DB;
+    if (!DB || typeof DB.enabled !== 'function' || !DB.enabled()) return Promise.resolve(fallback(null));
+    var p;
+    try {
+      p = DB.fetchPublic();
+    } catch (e) {
+      return Promise.resolve(fallback(String(e && e.message ? e.message : e)));
+    }
+    return p.then(function (raw) {
+      var a = DB.adapt(raw, window.ECO_TREES, window.ECO_SPECIES);
+      var d = ECO.validateData(a.trees, a.species, 'supabase');
+      if (!d.ok || !d.trees.length) return fallback('данные базы не прошли проверку');
+      d.source = 'supabase';
+      d.snapshotDate = null;
+      return d;
+    }).then(null, function (e) {
+      return fallback(String(e && e.message ? e.message : e));
+    });
+  };
+
+  // Строка источника данных: «Данные: онлайн-база» / «Данные: снимок от <дата>».
+  ECO.dataSourceText = function (data) {
+    if (!data || !data.ok) return '';
+    if (data.source === 'supabase') return 'Данные: онлайн-база';
+    var d = ECO.formatDate(data.snapshotDate);
+    return d ? 'Данные: снимок от ' + d : 'Данные: снимок (файл сайта)';
+  };
+  ECO.showDataSource = function (data) {
+    var box = document.getElementById('data-source');
+    var text = ECO.dataSourceText(data);
+    if (!box || !text) return;
+    box.textContent = text;
+    box.setAttribute('data-source', data.source);
+    box.hidden = false;
+  };
+
+  // Запуск страницы: данные (асинхронно) → main(data). window.ECO_PAGE_PENDING — промис запуска,
+  // его ждёт страховка «сайт не загрузился» в HTML (не срабатывает, пока данные в пути).
+  ECO.runPage = function (main, fatalTitle, fatalLinks) {
+    function fatal(e) { ECO.showFatal(fatalTitle, [String(e && e.message ? e.message : e)], fatalLinks); }
+    var p = ECO.loadDataAsync().then(function (data) {
+      ECO.lastData = data;
+      ECO.showDataSource(data);
+      var r = main(data);
+      return r && typeof r.then === 'function' ? r.then(null, fatal) : r;
+    }).then(null, fatal);
+    window.ECO_PAGE_PENDING = p;
+    return p;
+  };
+
+  // Проверка набора данных (общая для снимка и онлайн-базы). Возвращает {ok, trees, species, errors, warnings}.
+  ECO.validateData = function (trees, species, origin) {
     var errors = [];
     var warnings = [];
-    var trees = window.ECO_TREES;
-    var species = window.ECO_SPECIES;
     if (!Array.isArray(trees)) errors.push('Не загрузился файл data/trees.js (список деревьев).');
     if (!species || typeof species !== 'object') errors.push('Не загрузился файл data/species.js (справочник пород).');
     if (errors.length) return { ok: false, trees: [], species: {}, errors: errors, warnings: warnings };
@@ -245,7 +323,7 @@
       clean.push(t);
     });
     warnings.forEach(function (w) {
-      if (window.console) console.warn('[EcoTreeMap] ' + w);
+      if (window.console) console.warn('[EcoTreeMap] ' + (origin === 'supabase' ? '(онлайн-база) ' : '') + w);
     });
     return { ok: true, trees: clean, species: species, errors: errors, warnings: warnings };
   };

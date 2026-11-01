@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<title>Модерация — EcoTreeMap</title>
+<link rel="stylesheet" href="../assets/css/site.css?v=902d00c6">
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <h1>Модерация</h1>
+    <p class="sub">Команды, предложения деревьев, фото, опека, осмотры и роли</p>
+  </div>
+  <nav aria-label="Разделы сайта">
+    <a href="../index.html">Карта</a>
+    <a href="species.html">Породы</a>
+    <a href="stats.html">Статистика</a>
+    <a href="credits.html">Источники</a>
+    <a href="privacy.html">Приватность</a>
+    <a href="account.html">Аккаунт</a>
+  </nav>
+</header>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<main class="page">
+  <p id="mod-msg" class="acc-msg" role="status" aria-live="polite" hidden></p>
+
+  <section class="card" id="mod-offline" hidden>
+    <h2>Модерация недоступна</h2>
+    <p>Модерация работает только на опубликованном сайте с онлайн-базой.</p>
+  </section>
+
+  <section class="card" id="mod-loading">
+    <p class="muted">Проверяем доступ…</p>
+  </section>
+
+  <section class="card" id="mod-denied" hidden>
+    <h2>Нет доступа</h2>
+    <p id="mod-denied-text">Эта страница — только для модератора и администратора проекта.</p>
+    <p><a class="btn btn--outline" href="account.html">Перейти в «Аккаунт»</a></p>
+  </section>
+
+  <section class="card" id="mod-error" hidden>
+    <h2>Не получилось открыть модерацию</h2>
+    <p id="mod-error-text"></p>
+    <p class="acc-actions"><button type="button" class="btn btn--primary" id="mod-retry">Повторить</button></p>
+  </section>
+
+  <div id="mod-main" hidden>
+    <section class="card">
+      <p>Вы вошли как <b id="mod-who"></b>. Решения записываются в онлайн-базу сразу; права проверяет сама база.</p>
+      <p class="acc-actions"><button type="button" class="btn btn--outline" id="mod-refresh">Обновить очереди</button></p>
+    </section>
+
+    <section class="card" id="q-teams">
+      <h2>Команды</h2>
+      <p class="muted">Подтверждение — только по коду заявки, который руководитель команды сообщает лично. Код на этой
+        странице не показывается: введите его со слов руководителя.</p>
+      <ul class="mod-list" id="list-teams"></ul>
+    </section>
+
+    <section class="card" id="q-proposals">
+      <h2>Предложения деревьев</h2>
+      <p class="muted">Номер нового дерева можно исправить перед подтверждением; после подтверждения он печатается на табличке.</p>
+      <ul class="mod-list" id="list-proposals"></ul>
+    </section>
+
+    <section class="card" id="q-photos">
+      <h2>Фото на проверке</h2>
+      <p class="muted">На сайт попадают только фото без людей и без лишних деталей. При одобрении фото перекодируется
+        (метаданные снимаются ещё раз) и переносится в публичное хранилище.</p>
+      <ul class="mod-list" id="list-photos"></ul>
+    </section>
+
+    <section class="card" id="q-patronage">
+      <h2>Заявки на опеку</h2>
+      <ul class="mod-list" id="list-patronage"></ul>
+    </section>
+
+    <section class="card" id="q-observations">
+      <h2>Последние осмотры (50)</h2>
+      <p class="muted">Осмотры публикуются сразу. Скрытый осмотр и его фото пропадают с сайта; «Вернуть» показывает их снова.</p>
+      <ul class="mod-list" id="list-observations"></ul>
+    </section>
+
+    <section class="card" id="q-roles" hidden>
+      <h2>Роли (только администратор)</h2>
+      <form id="role-form" novalidate>
+        <label for="role-account">Код аккаунта (8 знаков со страницы «Аккаунт») или полный номер</label>
+        <input type="text" id="role-account" name="account" maxlength="36" autocomplete="off" spellcheck="false" required>
+        <label for="role-select">Роль</label>
+        <select id="role-select" name="role">
+          <option value="moderator">модератор</option>
+          <option value="admin">администратор</option>
+          <option value="team">руководитель команды (снять роль модератора)</option>
+        </select>
+        <p class="acc-actions"><button type="submit" class="btn btn--primary" id="role-btn">Назначить роль</button></p>
+      </form>
+      <p id="role-msg" class="acc-msg" role="status" aria-live="polite" hidden></p>
+      <h3>Модераторы и администраторы</h3>
+      <ul class="mod-list" id="list-staff"></ul>
+    </section>
+  </div>
+</main>
+<noscript><p class="fatal">Для модерации нужен JavaScript. Включите его в браузере.</p></noscript>
+
+<script src="../assets/js/config.js?v=7d3d018b"></script>
+<script src="../assets/lib/supabase/supabase.js?v=ee3be8de"></script>
+<script src="../assets/js/common.js?v=f7eb484c"></script>
+<script src="../assets/js/db.js?v=c7d80ee4"></script>
+<script src="../assets/js/moderate.js?v=7379abce"></script>
+<script>
+  (function () {
+    // Страховка: если скрипты сайта не загрузились, показать причину (moderate.js ставит window.ECO_PAGE_PENDING).
+    window.addEventListener('load', function () {
+      var pending = window.ECO_PAGE_PENDING;
+      if (pending && typeof pending.then === 'function') pending.then(check, check); else check();
+    });
+    function check() {
+      if (window.ECO_PAGE_DONE) return;
+      var box = document.getElementById('fatal');
+      if (!box.hidden && box.textContent) return;
+      box.textContent = 'Не удалось загрузить файлы сайта (папка assets/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
+      box.hidden = false;
+      var l = document.getElementById('mod-loading');
+      if (l) l.hidden = true;
+    }
+  })();
+</script>
+</body>
+</html>

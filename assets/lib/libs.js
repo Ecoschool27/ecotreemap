@@ -31,5 +31,15 @@ window.ECO_LIBS = [
     "copyright": "© 2009 Kazuhiko Arase",
     "homepage": "https://github.com/kazuhikoarase/qrcode-generator",
     "purpose": "QR-таблички в полевом режиме"
+  },
+  {
+    "dir": "supabase",
+    "name": "supabase-js",
+    "version": "2.118.0",
+    "license": "MIT",
+    "license_url": "supabase/LICENSE",
+    "copyright": "© 2020 Supabase",
+    "homepage": "https://github.com/supabase/supabase-js",
+    "purpose": "чтение онлайн-базы проекта"
   }
 ];

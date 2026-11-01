@@ -22,5 +22,25 @@ window.ECO_CONFIG = {
   // Центр карты по умолчанию и начальный масштаб (стартовый вид; места деревьев отмечаются
   // в tools/editor.html и tools/field.html).
   MAP_CENTER: [49.777, 73.124],
-  MAP_ZOOM: 16
+  MAP_ZOOM: 16,
+
+  // Источник данных публичных страниц:
+  //   "supabase" — онлайн-база проекта; при любом сбое (нет сети, база спит, отказ, 5 с без ответа)
+  //                сайт целиком берёт снимок data/trees.js и data/species.js;
+  //   "static"   — только снимок data/trees.js и data/species.js (откат без базы).
+  // С флешки (file://) сайт всегда работает на снимке и в сеть не ходит.
+  DATA_SOURCE: "supabase",
+
+  // Проекты Supabase. Ключ publishable — публичный (не секрет): права даёт только политика
+  // базы (RLS). Секретные ключи сюда НЕ вписывать никогда — сборка (tools/build_publish.py) откажет.
+  SUPABASE_PROJECTS: {
+    prod: { url: "https://ovwjcdnasupqjkhrgmcq.supabase.co", key: "sb_publishable_fxBIIOvubF_DfabMcaSX-Q_fqpSS7H6" },
+    test: { url: "https://kkshzshzvmypbguqwyuy.supabase.co", key: "sb_publishable_zbtLn8BPwm9GM6AfXfMqjg_KAcGeFyC" }
+  },
+  // Какой проект использует сайт. Публикуется только "prod" (сборка проверяет).
+  // Переключение через адрес страницы или хранилище браузера намеренно не предусмотрено.
+  SUPABASE_TARGET: "prod",
+
+  // Версия текста согласия на обработку данных (страница «Аккаунт»).
+  CONSENT_VERSION: "2026-11-01"
 };

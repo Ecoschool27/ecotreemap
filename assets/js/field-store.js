@@ -1,5 +1,6 @@
 // EcoTreeMap — хранилище полевого режима (IndexedDB): записи и фото живут в браузере телефона,
-// пока их не выгрузят в файл JSON. Ничего не отправляет в сеть.
+// пока их не выгрузят в файл JSON. Ничего не отправляет в сеть (отправку в онлайн-базу ведёт field-sync.js;
+// здесь — только поля её состояния у записи: sync_step, synced_at, sync_error, отметка команды).
 (function () {
   'use strict';
   var DB_NAME = 'ecotreemap_field';
@@ -75,6 +76,29 @@
           });
         }));
       });
+    },
+    // ---------- онлайн-отправка (field-sync.js): только новые поля записи, остальное не трогается ----------
+    // Поля, которые может менять очередь отправки: отметка команды и состояние отправки.
+    SYNC_FIELDS: ['user_id', 'team_id', 'sync_step', 'synced_at', 'sync_error'],
+    // Меняет у записи только поля отправки (чтение и запись — одной транзакцией, exported_at и данные записи
+    // не затираются). Возвращает обновлённую запись или null, если записи нет.
+    setSyncState: function (uid, patch) {
+      var allowed = window.ECO_FIELD_STORE.SYNC_FIELDS;
+      return tx(['records'], 'readwrite', function (t) {
+        var store = t.objectStore('records');
+        return req(store.get(uid)).then(function (rec) {
+          if (!rec) return null;
+          Object.keys(patch || {}).forEach(function (k) {
+            if (allowed.indexOf(k) !== -1) rec[k] = patch[k];
+          });
+          store.put(rec);
+          return rec;
+        });
+      });
+    },
+    // Заменяет фото записи (очищенная копия перед отправкой).
+    putPhoto: function (uid, blob) {
+      return tx(['photos'], 'readwrite', function (t) { t.objectStore('photos').put(blob, uid); });
     },
     // Просит браузер не удалять данные сайта при нехватке места. Возвращает true/false/null.
     persist: function () {

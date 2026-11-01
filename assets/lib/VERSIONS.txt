@@ -25,5 +25,20 @@ qrcode-generator 2.0.4 (MIT, (c) 2009 Kazuhiko Arase) — https://github.com/kaz
   LICENSE.txt — стандартный текст MIT (в пакете отдельного файла лицензии нет; MIT указана в package.json
   и в заголовке qrcode.js). Дата сверки: 2026-11-01.
 
+@supabase/supabase-js 2.118.0 (MIT, (c) 2020 Supabase) — https://github.com/supabase/supabase-js
+  Чтение онлайн-базы проекта (Supabase). Сборка UMD включает зависимости того же выпуска 2.118.0
+  (@supabase/postgrest-js, auth-js, storage-js, realtime-js, functions-js — все MIT).
+  архив:     https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-2.118.0.tgz
+  integrity: sha512-FxI8UXMVC2UG7IkeiI8fuQZqq2oI3JeSuN8MPIC2RLVaoEAxKS0nqE6kii9Ewpq8f9gNPM6git1Y8f0vN/QLFw==
+  supabase.js (из dist/umd/supabase.js)  sha256-7jvo3hkrl8sdc9HpXWuCux9rZYwPl8TvdX/DMZlu09M=
+    (совпадает побайтно с https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js)
+  LICENSE (из пакета)                    sha256-M03Wgg4urqsgZOfFkAG4EFZnKKKKQafB2/abvuF9CTY=
+  Дата сверки: 2026-11-01.
+
+Закрепление для проверки сборки (tools/build_publish.py): файл библиотеки с этим хэшем освобождён
+только от проверки на служебные слова ключей (в коде библиотеки они встречаются как часть логики);
+изменённый файл не совпадёт с хэшем — сборка откажет.
+pin: assets/lib/supabase/supabase.js sha256-7jvo3hkrl8sdc9HpXWuCux9rZYwPl8TvdX/DMZlu09M=
+
 Подложка карты (тайлы) грузится из интернета: https://tile.openstreetmap.org/{z}/{x}/{y}.png
 Без интернета точки, легенда и паспорта работают, подложка — нет (страница об этом сообщает).

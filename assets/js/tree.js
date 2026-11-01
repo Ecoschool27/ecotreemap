@@ -32,8 +32,139 @@
     dl.appendChild(typeof value === 'string' ? el('dd', { text: value }) : el('dd', null, [value]));
   }
 
-  function main() {
-    var data = ECO.loadData();
+  // Одобренные фото из онлайн-базы: адрес обязан быть нашим публичным (ECO.DB.isPublicPhotoUrl), иначе фото нет.
+  function remotePhotos(tree) {
+    var DB = ECO.DB;
+    if (!tree || !Array.isArray(tree.remote_photos) || !DB || typeof DB.isPublicPhotoUrl !== 'function') return [];
+    return tree.remote_photos.filter(function (p) { return p && DB.isPublicPhotoUrl(p.url); }).map(function (p) {
+      return { url: p.url, date: ECO.parseDate(p.date) ? p.date : null, status: null };
+    });
+  }
+
+  // Опека для вошедшей ПОДТВЕРЖДЁННОЙ команды: «Взять под опеку» → заявка ждёт модератора → «Отказаться».
+  // Только при данных из онлайн-базы. Клиент с сессией — лишь для этих действий; публичная отрисовка страницы —
+  // по-прежнему анонимным чтением (ECO.loadDataAsync). Посетителю без входа блок не показывается.
+  function patronageBox(tree, data) {
+    var DB = ECO.DB;
+    if (!data || data.source !== 'supabase' || !DB || typeof DB.loadTeamProfile !== 'function' || !DB.enabled()) return null;
+    var box = el('section', { className: 'card', hidden: true, attrs: { id: 'patronage' } });
+    var msg = el('p', { className: 'acc-msg', hidden: true, attrs: { id: 'patronage-msg', role: 'status', 'aria-live': 'polite' } });
+    var body = el('div', { attrs: { id: 'patronage-body' } });
+    box.appendChild(el('h2', { text: 'Опека команды' }));
+    box.appendChild(body);
+    box.appendChild(msg);
+    var profile = null;
+    var busy = false;
+
+    function say(text, kind) {
+      msg.textContent = text || '';
+      msg.className = 'acc-msg' + (kind ? ' acc-msg--' + kind : '');
+      msg.hidden = !text;
+    }
+    function warn(e) {
+      if (window.console) console.warn('[EcoTreeMap] опека: ' + String(e && (e.code || e.name) || 'ошибка'));
+    }
+    function button(id, text, cls, onClick) {
+      var b = el('button', { type: 'button', className: 'btn ' + cls, text: text, attrs: { id: id } });
+      b.addEventListener('click', function () {
+        if (busy) return;
+        busy = true;
+        b.disabled = true;
+        say('');
+        Promise.resolve().then(onClick).then(null, function (e) {
+          warn(e);
+          say(DB.errorText(e), 'error');
+        }).then(function () { busy = false; b.disabled = false; });
+      });
+      return b;
+    }
+    function ownRow() {
+      return DB.session().from('patronage').select('id,status')
+        .eq('tree_id', tree.id).eq('team_id', profile.team.id).in('status', ['pending', 'approved'])
+        .order('requested_at', { ascending: false }).limit(1)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          return res.data && res.data[0] ? res.data[0] : null;
+        });
+    }
+    function render(row) {
+      ECO.clear(body);
+      var team = '«' + profile.team.name + '»';
+      if (row && row.status === 'approved') {
+        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'approved' },
+          text: 'Ваша команда ' + team + ' опекает это дерево.' }));
+      } else if (row) {
+        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'pending' },
+          text: 'Заявка команды ' + team + ' на опеку ждёт модератора.' }));
+      } else if (ECO.patronOf(tree)) {
+        box.hidden = true; // у дерева уже есть шеф — кнопки нет
+        return;
+      } else {
+        body.appendChild(el('p', { attrs: { id: 'patronage-state', 'data-state': 'none' },
+          text: 'Команда ' + team + ' может взять это дерево под опеку: поливать, осматривать и отмечать состояние. ' +
+            'Заявку подтверждает модератор.' }));
+        body.appendChild(el('p', { className: 'acc-actions' }, [
+          button('patronage-take', 'Взять под опеку', 'btn--primary', function () {
+            return DB.session().from('patronage').insert({ tree_id: tree.id, status: 'pending' }).then(function (res) {
+              if (res.error && res.error.code !== '23505') throw res.error; // 23505 — заявка уже есть (повтор)
+              return refresh('Заявка отправлена. Опека начнётся после подтверждения модератором.');
+            });
+          })
+        ]));
+        box.hidden = false;
+        return;
+      }
+      body.appendChild(el('p', { className: 'acc-actions' }, [
+        button('patronage-end', row.status === 'approved' ? 'Отказаться от опеки' : 'Отозвать заявку', 'btn--outline', function () {
+          if (!window.confirm(row.status === 'approved' ? 'Отказаться от опеки дерева ' + tree.id + '?'
+            : 'Отозвать заявку на опеку дерева ' + tree.id + '?')) return null;
+          var was = row.status;
+          return DB.session().from('patronage').update({ status: 'ended' }).eq('id', row.id).then(function (res) {
+            if (res.error) throw res.error;
+            return refresh(was === 'approved' ? 'Опека завершена. Строка «Под опекой» на странице обновится после перезагрузки.'
+              : 'Заявка отозвана.', was === 'approved');
+          });
+        })
+      ]));
+      box.hidden = false;
+    }
+    // Шеф дерева по свежему публичному чтению (после отказа от опеки у дерева может остаться групповой или
+    // исторический шеф — его нельзя «сбросить» локально). Нет онлайн-данных — null (кнопку не показываем).
+    function freshPatron() {
+      return ECO.loadDataAsync().then(function (d) {
+        if (!d || !d.ok || d.source !== 'supabase') return null;
+        var t = ECO.byId(d, tree.id);
+        return t ? { patron: t.patron, patron_since: t.patron_since } : null;
+      });
+    }
+    function refresh(text, ended) {
+      return ownRow().then(function (row) {
+        if (!ended || row) return row;
+        // Своя опека только что завершена: строка «Под опекой» на странице обновится при перезагрузке,
+        // а кнопку решаем по свежим данным — групповой/исторический шеф остаётся шефом.
+        return freshPatron().then(function (f) {
+          if (f) tree = Object.assign({}, tree, f); // нет свежих данных — шеф прежний, кнопка не появляется
+          return null;
+        });
+      }).then(function (row) {
+        render(row);
+        if (text) {
+          say(text);
+          box.hidden = false; // итог действия виден, даже если кнопки у дерева с другим шефом нет
+        }
+      });
+    }
+
+    // data-ready="1" — проверка входа и своей заявки завершена (блок показан или остался скрытым)
+    DB.loadTeamProfile().then(function (p) {
+      if (!p || p.role !== 'team' || !p.team || p.team.status !== 'approved') return null;
+      profile = p;
+      return refresh('');
+    }).then(null, warn).then(function () { box.setAttribute('data-ready', '1'); });
+    return box;
+  }
+
+  function main(data) {
     if (!data.ok) {
       ECO.showFatal('Данные о деревьях не загрузились', data.errors, [{ href: '../index.html', text: 'Открыть карту' }]);
       return;
@@ -107,15 +238,24 @@
     ]);
     if (tree.notes) main.appendChild(el('p', { className: 'note', text: String(tree.notes) }));
     content.appendChild(main);
+    var patBox = patronageBox(tree, data);
+    if (patBox) content.appendChild(patBox);
 
     // ----- фото: своё фото дерева приоритетнее фото породы; при 2+ фото — «было → стало» и лента по датам -----
+    // одобренные фото из онлайн-базы (только наш публичный бакет, проверка адреса — ECO.DB.isPublicPhotoUrl)
+    var remote = remotePhotos(tree);
     var history = ECO.photoHistory(tree);
+    if (remote.length) {
+      history = history.concat(remote);
+      // новые первыми; за один день порядок прежний (сортировка устойчивая)
+      history.sort(function (a, b) { var da = a.date || '', db = b.date || ''; return da < db ? 1 : da > db ? -1 : 0; });
+    }
     var cfg = window.ECO_CONFIG || {};
     var credit = typeof cfg.TREE_PHOTO_CREDIT === 'string' && cfg.TREE_PHOTO_CREDIT.trim()
       ? cfg.TREE_PHOTO_CREDIT.trim() : 'Фото: участники проекта EcoTreeMap';
     function histFigure(h, label) {
       var date = ECO.formatDate(h.date);
-      var img = el('img', { attrs: { src: '../images/' + h.path, alt: 'Дерево ' + tree.id + (date ? ', ' + date : ''), loading: 'lazy' } });
+      var img = el('img', { attrs: { src: h.url || '../images/' + h.path, alt:'Дерево ' + tree.id + (date ? ', ' + date : ''), loading: 'lazy' } });
       var fig = el('figure', { className: 'photo photo--tree', style: 'margin:0' }, [
         img,
         el('figcaption', { className: 'photo-credit', text: (label ? label + ': ' : '') + (date || 'дата не указана') +
@@ -136,6 +276,12 @@
         el('div', { className: 'before-after' }, [histFigure(first, 'Было'), histFigure(last, 'Стало')]),
         el('h3', { text: 'Все фото по датам (' + history.length + ')' }),
         strip,
+        el('p', { className: 'photo-credit', text: credit })
+      ]);
+    } else if (history.length === 1 && history[0].url) {
+      photoCard = el('section', { className: 'card' }, [
+        el('h2', { text: 'Фото дерева' }),
+        histFigure(history[0]),
         el('p', { className: 'photo-credit', text: credit })
       ]);
     } else {
@@ -160,6 +306,7 @@
         if (o.watered === true) parts.push((o.status ? '; ' : '') + 'полито');
         if (ECO.obsPhotoPath(tree, o)) parts.push('; фото');
         if (o.notes) parts.push(' — ' + String(o.notes).slice(0, 500));
+        if (typeof o.team === 'string' && o.team) parts.push(' (команда «' + o.team.slice(0, 60) + '»)');
         ol.appendChild(el('li', { text: parts.join('') }));
       });
       content.appendChild(el('section', { className: 'card' }, [el('h2', { text: 'История осмотров' }), ol]));
@@ -261,9 +408,15 @@
     window.ECO_PAGE_DONE = true;
   }
 
-  try {
-    main();
-  } catch (e) {
-    ECO.showFatal('Ошибка на странице паспорта', [String(e && e.message ? e.message : e)], [{ href: '../index.html', text: 'Открыть карту' }]);
+  // Данные — асинхронно (онлайн-база или снимок, assets/js/db.js + common.js). Старый common.js без
+  // ECO.runPage (смешение версий в кэше) — синхронно из снимка, как раньше.
+  if (typeof ECO.runPage === 'function') {
+    ECO.runPage(main, 'Ошибка на странице паспорта', [{ href: '../index.html', text: 'Открыть карту' }]);
+  } else {
+    try {
+      main(ECO.loadData());
+    } catch (e) {
+      ECO.showFatal('Ошибка на странице паспорта', [String(e && e.message ? e.message : e)], [{ href: '../index.html', text: 'Открыть карту' }]);
+    }
   }
 })();

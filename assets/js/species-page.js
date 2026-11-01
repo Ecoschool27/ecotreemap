@@ -15,8 +15,7 @@
     return String(s || '').toLowerCase().replace(/ё/g, 'е');
   }
 
-  function main() {
-    var data = ECO.loadData();
+  function main(data) {
     if (!data.ok) {
       ECO.showFatal(t('common.data_failed', 'Данные не загрузились'), data.errors,
         [{ href: '../index.html', text: t('common.open_map', 'Открыть карту') }]);
@@ -164,9 +163,15 @@
     window.ECO_PAGE_DONE = true;
   }
 
-  try {
-    main();
-  } catch (e) {
-    ECO.showFatal('Ошибка на странице пород', [String(e && e.message ? e.message : e)], [{ href: '../index.html', text: 'Открыть карту' }]);
+  // Данные — асинхронно (онлайн-база или снимок, assets/js/db.js + common.js). Старый common.js без
+  // ECO.runPage (смешение версий в кэше) — синхронно из снимка, как раньше.
+  if (typeof ECO.runPage === 'function') {
+    ECO.runPage(main, 'Ошибка на странице пород', [{ href: '../index.html', text: 'Открыть карту' }]);
+  } else {
+    try {
+      main(ECO.loadData());
+    } catch (e) {
+      ECO.showFatal('Ошибка на странице пород', [String(e && e.message ? e.message : e)], [{ href: '../index.html', text: 'Открыть карту' }]);
+    }
   }
 })();

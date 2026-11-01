@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Аккаунт команды — EcoTreeMap</title>
+<link rel="stylesheet" href="../assets/css/site.css?v=902d00c6">
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <h1>Аккаунт команды</h1>
+    <p class="sub">Вход руководителя и регистрация команды</p>
+  </div>
+  <nav aria-label="Разделы сайта">
+    <a href="../index.html">Карта</a>
+    <a href="species.html">Породы</a>
+    <a href="stats.html">Статистика</a>
+    <a href="credits.html">Источники</a>
+    <a href="privacy.html">Приватность</a>
+    <a href="account.html" aria-current="page">Аккаунт</a>
+  </nav>
+</header>
+<div id="fatal" class="fatal" role="alert" hidden></div>
+<main class="page">
+  <p id="acc-msg" class="acc-msg" role="status" aria-live="polite" hidden></p>
+
+  <section class="card" id="acc-offline" hidden>
+    <h2>Аккаунт недоступен</h2>
+    <p id="acc-offline-text">Вход и регистрация работают только на опубликованном сайте с онлайн-базой.</p>
+    <p class="muted">Карта, паспорта деревьев и полевой режим работают и без аккаунта.</p>
+  </section>
+
+  <section class="card" id="acc-loading">
+    <p class="muted">Проверяем вход…</p>
+  </section>
+
+  <section class="card" id="acc-retry" hidden>
+    <h2>Нет связи с базой</h2>
+    <p id="acc-retry-text">Онлайн-база не ответила, поэтому проверить вход не получилось. Проверьте интернет и нажмите «Повторить».</p>
+    <p class="muted">Если это чужое или общее устройство — нажмите «Выйти на этом устройстве»: вход удалится с устройства и без связи.</p>
+    <p class="acc-actions"><button type="button" class="btn btn--primary" id="retry-btn">Повторить</button>
+      <button type="button" class="btn" id="retry-signout-btn">Выйти на этом устройстве</button></p>
+  </section>
+
+  <section class="card" id="acc-signin" hidden>
+    <h2>Вход</h2>
+    <p class="acc-msg acc-msg--warn" id="signin-warn"><b>Чужой или общий компьютер?</b> Лучше не входите с него. Если вошли — после работы
+      обязательно нажмите «Выйти на этом устройстве»: иначе следующий человек за этим компьютером окажется в аккаунте команды.</p>
+    <form id="signin-form" novalidate>
+      <label for="signin-email">Email руководителя</label>
+      <input type="email" id="signin-email" name="email" autocomplete="username" required maxlength="254">
+      <label for="signin-password">Пароль</label>
+      <input type="password" id="signin-password" name="password" autocomplete="current-password" required maxlength="72">
+      <p class="acc-actions"><button type="submit" class="btn btn--primary" id="signin-btn">Войти</button></p>
+    </form>
+    <p class="muted">Забыли пароль — обратитесь к координатору проекта: сброса пароля по почте на сайте нет.</p>
+  </section>
+
+  <section class="card" id="acc-signup" hidden>
+    <h2>Регистрация руководителя команды</h2>
+    <p>Аккаунт заводит взрослый руководитель команды. Храним email и пароль (в системе входа; при каждом входе она
+      также записывает адрес подключения, браузер и время), а для команды — её название и, если хотите, школу.
+      Имена, фамилии и телефоны не нужны.</p>
+    <form id="signup-form" novalidate>
+      <label for="signup-email">Email руководителя</label>
+      <input type="email" id="signup-email" name="email" autocomplete="username" required maxlength="254">
+      <label for="signup-password">Пароль (не меньше 8 знаков)</label>
+      <input type="password" id="signup-password" name="password" autocomplete="new-password" required minlength="8" maxlength="72">
+      <label for="signup-password2">Пароль ещё раз</label>
+      <input type="password" id="signup-password2" name="password2" autocomplete="new-password" required minlength="8" maxlength="72">
+      <p class="acc-actions"><button type="submit" class="btn btn--outline" id="signup-btn">Зарегистрироваться</button></p>
+    </form>
+    <p class="muted">Писем сайт не отправляет. Запомните пароль: восстановить его можно только через координатора проекта.
+      Подробно о данных — на странице <a href="privacy.html">«Приватность»</a>.</p>
+  </section>
+
+  <section class="card" id="acc-profile" hidden>
+    <h2>Вы вошли</h2>
+    <dl class="facts">
+      <dt>Email</dt><dd id="acc-email"></dd>
+      <dt>Роль</dt><dd id="acc-role"></dd>
+      <dt>Код аккаунта</dt><dd><code id="acc-code"></code></dd>
+    </dl>
+    <p class="muted">Код аккаунта (первые 8 знаков номера) нужен координатору, чтобы назначить роль модератора.</p>
+    <p id="acc-moderate" hidden><a class="btn btn--primary" id="acc-moderate-link" href="moderate.html">Модерация</a></p>
+    <p class="acc-actions"><button type="button" class="btn" id="signout-btn">Выйти на этом устройстве</button></p>
+  </section>
+
+  <section class="card" id="acc-team" hidden>
+    <h2>Команда</h2>
+    <dl class="facts">
+      <dt>Название</dt><dd id="team-name"></dd>
+      <dt>Школа</dt><dd id="team-school"></dd>
+      <dt>Статус</dt><dd id="team-status"></dd>
+      <dt>Код заявки</dt><dd><code id="team-code"></code></dd>
+    </dl>
+    <p class="muted" id="team-hint"></p>
+  </section>
+
+  <section class="card" id="acc-newteam" hidden>
+    <h2>Создать команду</h2>
+    <form id="team-form" novalidate>
+      <label for="team-name-input">Название команды</label>
+      <input type="text" id="team-name-input" name="name" required minlength="3" maxlength="60" autocomplete="off"
+             aria-describedby="team-name-help">
+      <p class="muted" id="team-name-help">Без имён и фамилий — например «Юные экологи 8Б». Название видно на сайте всем.</p>
+      <label for="team-school-input">Школа (необязательно)</label>
+      <input type="text" id="team-school-input" name="school" maxlength="80" autocomplete="off" aria-describedby="team-school-help">
+      <p class="muted" id="team-school-help">Если указать, школа будет видна вместе с названием команды.</p>
+      <label class="check consent"><input type="checkbox" id="team-consent" name="consent" required>
+        <span>Я — взрослый руководитель команды, прочитал(а) страницу «Приватность» и согласен(на) на хранение
+          и обработку данных команды так, как там описано (версия согласия <span id="consent-version"></span>).</span></label>
+      <p class="muted"><a href="privacy.html">Открыть «Приватность»</a></p>
+      <p class="acc-actions"><button type="submit" class="btn btn--primary" id="team-btn">Создать команду</button></p>
+    </form>
+  </section>
+</main>
+<noscript><p class="fatal">Для аккаунта нужен JavaScript. Включите его в браузере.</p></noscript>
+
+<script src="../assets/js/config.js?v=7d3d018b"></script>
+<script src="../assets/lib/supabase/supabase.js?v=ee3be8de"></script>
+<script src="../assets/js/common.js?v=f7eb484c"></script>
+<script src="../assets/js/db.js?v=c7d80ee4"></script>
+<script src="../assets/js/account.js?v=484c2ca9"></script>
+<script>
+  (function () {
+    // Страховка: если скрипты сайта не загрузились, показать причину (account.js ставит window.ECO_PAGE_PENDING).
+    window.addEventListener('load', function () {
+      var pending = window.ECO_PAGE_PENDING;
+      if (pending && typeof pending.then === 'function') pending.then(check, check); else check();
+    });
+    function check() {
+      if (window.ECO_PAGE_DONE) return;
+      var box = document.getElementById('fatal');
+      if (!box.hidden && box.textContent) return; // причину уже показал сайт (ECO.showFatal) — не перезаписываем
+      box.textContent = 'Не удалось загрузить файлы сайта (папка assets/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
+      box.hidden = false;
+      var l = document.getElementById('acc-loading');
+      if (l) l.hidden = true;
+    }
+  })();
+</script>
+</body>
+</html>

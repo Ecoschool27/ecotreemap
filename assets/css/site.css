@@ -663,3 +663,38 @@ legend {
 .chart-legend li { margin: 4px 0; }
 .lang-switch { margin-left: 8px; }
 @media (max-width: 420px) { .before-after { grid-template-columns: 1fr; } }
+
+/* строка источника данных («Данные: онлайн-база» / «Данные: снимок от …») — ненавязчиво */
+.data-source { margin: 8px 0 0; font-size: 0.85rem; color: var(--muted); }
+.data-source.page-source { max-width: 720px; margin: 0 auto; padding: 0 16px 24px; }
+
+/* ---------- аккаунт (pages/account.html) ---------- */
+input[type='email'],
+input[type='password'] {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #767c75;
+  border-radius: 8px;
+  font: inherit;
+  color: var(--text);
+  background: #fff;
+}
+.acc-actions { margin: 14px 0 0; }
+.acc-msg { margin: 0 0 14px; padding: 10px 12px; border-radius: 8px; background: var(--green-bg); border-left: 4px solid var(--green-dark); }
+.acc-msg--error { background: #fdecea; border-left-color: var(--danger); }
+.acc-msg--warn { background: #fff6d6; border-left-color: #8a6100; }
+.check.consent { align-items: flex-start; margin-top: 12px; }
+.check.consent input { margin-top: 2px; }
+.facts code, .card code { font-family: Consolas, "Courier New", monospace; font-size: 1.05em; letter-spacing: 0.05em; }
+
+/* ---------- модерация (pages/moderate.html) ---------- */
+.mod-list { list-style: none; margin: 0; padding: 0; }
+.mod-item { border-top: 1px solid #d9ddd8; padding: 12px 0; }
+.mod-item:first-child { border-top: 0; }
+.mod-item h3 { margin: 0 0 6px; font-size: 1.05em; word-break: break-word; }
+.mod-item p { margin: 4px 0; word-break: break-word; }
+.mod-item .acc-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.mod-item input[type='text'] { width: auto; max-width: 12em; }
+.mod-thumb { display: block; max-width: 100%; max-height: 320px; border-radius: 8px; background: #eef1ed; }
+.mod-hidden { opacity: 0.6; }

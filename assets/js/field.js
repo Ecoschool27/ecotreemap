@@ -64,6 +64,9 @@
   }
 
   // ---------- мелочи ----------
+  // Нижние границы — как в проверках онлайн-базы (001_schema.sql): planted_year ≥ 1950, observed_date ≥ 2020-01-01.
+  var MIN_YEAR = 1950;
+  var MIN_OBSERVED = '2020-01-01';
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function todayIso() {
     var d = new Date();
@@ -179,7 +182,7 @@
     return c;
   }
 
-  function main() {
+  function main(data) {
     if (!Array.isArray(window.ECO_TREES) || !window.ECO_SPECIES) {
       ECO.showFatal('Данные не загрузились', ['Не найдены data/trees.js или data/species.js рядом с папкой tools/.']);
       return;
@@ -188,7 +191,7 @@
       ECO.showFatal('Полевой режим не загрузился', ['Не найден файл assets/js/field-store.js.']);
       return;
     }
-    var data = ECO.loadData();
+    if (!data || !data.ok) data = ECO.loadData(); // сбой онлайн-базы уже обработан; страховка — снимок
     var species = data.species;
     var trees = data.trees;
     var treeById = Object.create(null);
@@ -497,8 +500,11 @@
     selEvent.addEventListener('change', function () { $('box-event-custom').hidden = selEvent.value !== EVENT_CUSTOM; });
     $('f-observed').value = todayIso();
     $('f-observed').max = todayIso();
+    $('f-observed').min = MIN_OBSERVED;
     $('f-date').max = todayIso();
+    $('f-date').min = MIN_YEAR + '-01-01';
     $('f-year').max = String(new Date().getFullYear());
+    $('f-year').min = String(MIN_YEAR);
 
     // ---------- фото ----------
     var photoInput = $('f-photo');
@@ -546,6 +552,7 @@
       var now = new Date().toISOString();
       var observed = $('f-observed').value || todayIso();
       if (!ECO.parseDate(observed) || observed > todayIso()) throw new Error('Дата осмотра не может быть в будущем.');
+      if (observed < MIN_OBSERVED) throw new Error('Дата осмотра — не раньше 01.01.2020.');
       var rec = {
         record_uid: uuid(), kind: k, id: null, species: null, event: null, planted_year: null, planted_date: null,
         lat: null, lon: null, coord_accuracy_m: null, coord_source: null,
@@ -587,7 +594,7 @@
       if (!rec.id) throw new Error('Не удалось выдать номер для этой породы.');
       var y = Number($('f-year').value);
       var cy = new Date().getFullYear();
-      if (!(Math.floor(y) === y && y >= 1900 && y <= cy)) throw new Error('Укажите год посадки (1900–' + cy + ').');
+      if (!(Math.floor(y) === y && y >= MIN_YEAR && y <= cy)) throw new Error('Укажите год посадки (' + MIN_YEAR + '–' + cy + ').');
       rec.planted_year = y;
       var d = $('f-date').value;
       if (d) {
@@ -662,12 +669,18 @@
       try { rec = buildRecord(); } catch (e) { result(e.message, true); return; }
       var base = siteBase();
       rec.qr_pending = rec.kind !== 'inspect' && !base;
+      // Вошла подтверждённая команда — запись помечается командой и уйдёт в онлайн-базу (field-sync.js).
+      var SYNC = window.ECO_FIELD_SYNC;
+      var online = !!(SYNC && SYNC.stamp(rec));
       state.saving = true;
       STORE.save(rec, state.photo).then(function () {
         records.push(rec);
         STORE.persist();
         result('Сохранено на телефоне: ' + rec.id + '. Номер закреплён за этой записью.' +
+          (online && rec.kind === 'new_tree' ? ' Номер ' + rec.id + ' предварительный: ' + SYNC.provisionalText + '.' : '') +
+          (online ? ' Запись отправится в онлайн-базу, когда есть связь.' : '') +
           (rec.qr_pending ? ' QR не построен: адрес сайта не задан — табличку можно будет сделать позже.' : ''), rec.qr_pending);
+        if (online) SYNC.kick();
         if (rec.kind !== 'inspect') showPlaque(rec);
         resetForm();
         updateKind();
@@ -715,6 +728,13 @@
       $('plaque-id').textContent = rec.id;
       $('plaque-species').textContent = species[rec.species] ? species[rec.species].name_ru : '';
       $('plaque-url').textContent = 'QR ведёт на: ' + url;
+      // номер нового дерева, отправленного командой в онлайн-базу, — предварительный до решения модератора
+      var prov = $('plaque-provisional');
+      if (prov) {
+        var isProv = !!(rec.team_id && rec.kind === 'new_tree' && window.ECO_FIELD_SYNC);
+        prov.textContent = isProv ? 'Номер ' + rec.id + ' предварительный: ' + window.ECO_FIELD_SYNC.provisionalText + '.' : '';
+        prov.hidden = !isProv;
+      }
       card.hidden = false;
       return true;
     }
@@ -742,17 +762,33 @@
     }
 
     // ---------- список и выгрузка ----------
+    // «Новые» для выгрузки: не выгруженные и не отправленные в онлайн-базу (отправленные уже в базе — в файле они
+    // дали бы повтор; их по-прежнему включает «Выгрузить всё», с полями synced_at/team_id).
     function pending() {
-      return records.filter(function (r) { return !r.exported_at || r.updated_at > r.exported_at; });
+      return records.filter(function (r) { return !r.synced_at && (!r.exported_at || r.updated_at > r.exported_at); });
     }
     var KIND_TEXT = { place_existing: 'место', new_tree: 'новое', inspect: 'осмотр' };
+    function syncLabel(r) {
+      var t = window.ECO_FIELD_SYNC ? window.ECO_FIELD_SYNC.label(r) : '';
+      return t ? ' · ' + t : '';
+    }
+    // field-sync.js сообщил новое состояние отправки записи — обновляем копию в списке
+    function onSyncRecord(upd) {
+      for (var i = 0; i < records.length; i++) {
+        if (records[i].record_uid !== upd.record_uid) continue;
+        STORE.SYNC_FIELDS.forEach(function (k) { if (ECO.hasOwn(upd, k)) records[i][k] = upd[k]; });
+        break;
+      }
+      renderRecords();
+    }
     function renderRecords() {
       var ul = ECO.clear($('records-list'));
       records.slice().sort(function (a, b) { return a.created_at < b.created_at ? 1 : -1; }).forEach(function (r) {
         var li = el('li', null, [
           el('b', { text: r.id }),
           ' · ' + KIND_TEXT[r.kind] + ' · ' + (r.status ? STATUS_TEXT[r.status] || r.status : 'без состояния') +
-            (r.watered ? ' · полито' : '') + (r.photo ? ' · фото' : '') + ' · ' + (r.exported_at ? 'выгружено' : 'не выгружено')
+            (r.watered ? ' · полито' : '') + (r.photo ? ' · фото' : '') + ' · ' + (r.exported_at ? 'выгружено' : 'не выгружено') +
+            syncLabel(r)
         ]);
         if (r.kind !== 'inspect' && siteBase()) {
           li.appendChild(el('button', { type: 'button', className: 'btn btn--outline', text: 'Табличка', onclick: function () { showPlaque(r); $('plaque-card').scrollIntoView(); } }));
@@ -760,6 +796,7 @@
         ul.appendChild(li);
       });
       if (!records.length) ul.appendChild(el('li', { className: 'muted', text: 'Записей пока нет.' }));
+      // отправленные в онлайн-базу не требуют выгрузки файлом
       var n = pending().length;
       var b = $('pending-banner');
       b.textContent = n + ' ' + ECO.plural(n, ['запись', 'записи', 'записей']) + ' ' +
@@ -780,7 +817,7 @@
     function exportRecords(all) {
       var list = all ? records.slice() : pending();
       if (!list.length) {
-        $('export-status').textContent = all ? 'Записей нет.' : 'Новых записей нет — всё уже выгружено.';
+        $('export-status').textContent = all ? 'Записей нет.' : 'Новых записей нет — всё уже выгружено или отправлено в онлайн-базу.';
         return Promise.resolve(null);
       }
       var when = new Date();
@@ -871,16 +908,23 @@
       if (!restoreFormAfterCamera()) openFromLink();
       renderRecords();
       window.ECO_PAGE_DONE = true;
+      // онлайн-отправка: без входа подтверждённой команды ничего не отправляет
+      if (window.ECO_FIELD_SYNC) window.ECO_FIELD_SYNC.init({ onRecord: onSyncRecord });
     }, function (e) {
       ECO.showFatal('Хранилище браузера недоступно', [String(e && e.message ? e.message : e),
         'Без него записи негде сохранить. Откройте страницу в обычном (не приватном) окне браузера.']);
     });
   }
 
-  try {
-    var p = main();
-    if (p && p.catch) p.catch(function (e) { ECO.showFatal('Ошибка полевого режима', [String(e && e.message ? e.message : e)]); });
-  } catch (e) {
-    ECO.showFatal('Ошибка полевого режима', [String(e && e.message ? e.message : e)]);
+  // Список деревьев — асинхронно (онлайн-база или снимок). Старый common.js — синхронно из снимка.
+  if (typeof ECO.runPage === 'function') {
+    ECO.runPage(main, 'Ошибка полевого режима');
+  } else {
+    try {
+      var p = main(ECO.loadData());
+      if (p && p.catch) p.catch(function (e) { ECO.showFatal('Ошибка полевого режима', [String(e && e.message ? e.message : e)]); });
+    } catch (e) {
+      ECO.showFatal('Ошибка полевого режима', [String(e && e.message ? e.message : e)]);
+    }
   }
 })();

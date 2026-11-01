@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="assets/lib/leaflet/leaflet.css?v=a7837102">
 <link rel="stylesheet" href="assets/lib/markercluster/MarkerCluster.css?v=614dea0a">
 <link rel="stylesheet" href="assets/lib/markercluster/MarkerCluster.Default.css?v=61258232">
-<link rel="stylesheet" href="assets/css/site.css?v=b251a9ba">
+<link rel="stylesheet" href="assets/css/site.css?v=902d00c6">
 </head>
 <body class="page-map">
 <header class="site-header">
@@ -20,6 +20,8 @@
     <a href="pages/species.html">Породы</a>
     <a href="pages/stats.html">Статистика</a>
     <a href="pages/credits.html">Источники</a>
+    <a href="pages/privacy.html">Приватность</a>
+    <a href="pages/account.html">Аккаунт</a>
   </nav>
 </header>
 <div id="fatal" class="fatal" role="alert" hidden></div>
@@ -45,6 +47,7 @@
       <summary id="unplaced-summary">Место не отмечено</summary>
       <div id="unplaced-list"></div>
     </details>
+    <p id="data-source" class="data-source" hidden></p>
   </aside>
   <main class="map-wrap">
     <div id="map" role="region" aria-label="Карта деревьев"></div>
@@ -53,21 +56,30 @@
 </div>
 <noscript><p class="fatal">Для карты нужен JavaScript. Включите его в браузере.</p></noscript>
 
-<script src="assets/js/config.js?v=acde99e3"></script>
+<script src="assets/js/config.js?v=7d3d018b"></script>
 <script src="data/species.js?v=87965e18"></script>
 <script src="data/trees.js?v=e7938355"></script>
 <script src="assets/lib/leaflet/leaflet.js?v=db49d009"></script>
 <script src="assets/lib/markercluster/leaflet.markercluster.js?v=1e4e1d22"></script>
-<script src="assets/js/common.js?v=6d6cdff5"></script>
-<script src="assets/js/map.js?v=4d415be4"></script>
+<script src="assets/lib/supabase/supabase.js?v=ee3be8de"></script>
+<script src="assets/js/common.js?v=f7eb484c"></script>
+<script src="assets/js/db.js?v=c7d80ee4"></script>
+<script src="assets/js/map.js?v=e6000bc1"></script>
 <script>
-  // Страховка: если скрипты сайта не загрузились (сайт опубликован не полностью), показать причину.
-  window.addEventListener('load', function () {
-    if (window.ECO_PAGE_DONE) return;
-    var box = document.getElementById('fatal');
-    box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
-    box.hidden = false;
-  });
+  (function () {
+    // Страховка: если скрипты сайта не загрузились (сайт опубликован не полностью), показать причину.
+    // Данные грузятся асинхронно (window.ECO_PAGE_PENDING): проверяем после их загрузки, а не на событии load.
+    window.addEventListener('load', function () {
+      var pending = window.ECO_PAGE_PENDING;
+      if (pending && typeof pending.then === 'function') pending.then(check, check); else check();
+    });
+    function check() {
+      if (window.ECO_PAGE_DONE) return;
+      var box = document.getElementById('fatal');
+      box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
+      box.hidden = false;
+    }
+  })();
 </script>
 </body>
 </html>

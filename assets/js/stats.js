@@ -90,8 +90,7 @@
     return s;
   };
 
-  function main() {
-    var data = ECO.loadData();
+  function main(data) {
     if (!data.ok) {
       ECO.showFatal('Данные не загрузились', data.errors, [{ href: '../index.html', text: 'Открыть карту' }]);
       return;
@@ -146,9 +145,15 @@
     window.ECO_PAGE_DONE = true;
   }
 
-  try {
-    main();
-  } catch (e) {
-    ECO.showFatal('Ошибка на странице статистики', [String(e && e.message ? e.message : e)], [{ href: '../index.html', text: 'Открыть карту' }]);
+  // Данные — асинхронно (онлайн-база или снимок, assets/js/db.js + common.js). Старый common.js без
+  // ECO.runPage (смешение версий в кэше) — синхронно из снимка, как раньше.
+  if (typeof ECO.runPage === 'function') {
+    ECO.runPage(main, 'Ошибка на странице статистики', [{ href: '../index.html', text: 'Открыть карту' }]);
+  } else {
+    try {
+      main(ECO.loadData());
+    } catch (e) {
+      ECO.showFatal('Ошибка на странице статистики', [String(e && e.message ? e.message : e)], [{ href: '../index.html', text: 'Открыть карту' }]);
+    }
   }
 })();

@@ -17,8 +17,7 @@
     return 'pages/tree.html?id=' + encodeURIComponent(id);
   }
 
-  function main() {
-    var data = ECO.loadData();
+  function main(data) {
     if (!data.ok) {
       ECO.showFatal('Данные о деревьях не загрузились', data.errors.concat([
         'Проверьте, что папка data/ лежит рядом с index.html.'
@@ -269,9 +268,15 @@
     window.ECO_PAGE_DONE = true;
   }
 
-  try {
-    main();
-  } catch (e) {
-    ECO.showFatal('Ошибка на странице карты', [String(e && e.message ? e.message : e)]);
+  // Данные — асинхронно (онлайн-база или снимок, assets/js/db.js + common.js). Старый common.js без
+  // ECO.runPage (смешение версий в кэше) — синхронно из снимка, как раньше.
+  if (typeof ECO.runPage === 'function') {
+    ECO.runPage(main, 'Ошибка на странице карты', null);
+  } else {
+    try {
+      main(ECO.loadData());
+    } catch (e) {
+      ECO.showFatal('Ошибка на странице карты', [String(e && e.message ? e.message : e)]);
+    }
   }
 })();

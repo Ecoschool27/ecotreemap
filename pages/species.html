@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
 <title>Породы деревьев — EcoTreeMap</title>
-<link rel="stylesheet" href="../assets/css/site.css?v=b251a9ba">
+<link rel="stylesheet" href="../assets/css/site.css?v=902d00c6">
 </head>
 <body>
 <header class="site-header">
@@ -17,25 +17,37 @@
     <a href="../index.html">Карта</a>
     <a href="stats.html">Статистика</a>
     <a href="credits.html">Источники</a>
+    <a href="privacy.html">Приватность</a>
+    <a href="account.html">Аккаунт</a>
   </nav>
 </header>
 <div id="fatal" class="fatal" role="alert" hidden></div>
 <main class="page" id="content"></main>
+<p id="data-source" class="data-source page-source" hidden></p>
 <noscript><p class="fatal">Для справочника пород нужен JavaScript. Включите его в браузере.</p></noscript>
 
-<script src="../assets/js/config.js?v=acde99e3"></script>
+<script src="../assets/js/config.js?v=7d3d018b"></script>
 <script src="../data/species.js?v=87965e18"></script>
 <script src="../data/trees.js?v=e7938355"></script>
 <script src="../images/sources.js?v=f1e04d7d"></script>
-<script src="../assets/js/common.js?v=6d6cdff5"></script>
-<script src="../assets/js/species-page.js?v=fd9f9313"></script>
+<script src="../assets/lib/supabase/supabase.js?v=ee3be8de"></script>
+<script src="../assets/js/common.js?v=f7eb484c"></script>
+<script src="../assets/js/db.js?v=c7d80ee4"></script>
+<script src="../assets/js/species-page.js?v=1a7084f0"></script>
 <script>
-  window.addEventListener('load', function () {
-    if (window.ECO_PAGE_DONE) return;
-    var box = document.getElementById('fatal');
-    box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
-    box.hidden = false;
-  });
+  (function () {
+    // Данные грузятся асинхронно (window.ECO_PAGE_PENDING): проверяем после их загрузки, а не на событии load.
+    window.addEventListener('load', function () {
+      var pending = window.ECO_PAGE_PENDING;
+      if (pending && typeof pending.then === 'function') pending.then(check, check); else check();
+    });
+    function check() {
+      if (window.ECO_PAGE_DONE) return;
+      var box = document.getElementById('fatal');
+      box.textContent = 'Не удалось загрузить файлы сайта (папки assets/ и data/). Проверьте, что сайт опубликован полностью (со всеми папками), и обновите страницу.';
+      box.hidden = false;
+    }
+  })();
 </script>
 </body>
 </html>
