@@ -206,7 +206,7 @@
     var statusDate = tree.status ? ECO.formatDate(tree.status_date) : null;
     fact(dl, 'Состояние', ECO.statusLabel(tree.status) + (statusDate ? ' (осмотр ' + statusDate + ')' : ''));
     var lastWater = ECO.lastWatered(tree);
-    fact(dl, 'Последний полив', lastWater ? ECO.formatDate(lastWater) : 'Полив ещё не отмечен');
+    fact(dl, 'Последний полив', lastWater ? ECO.formatDate(lastWater) : 'Полив не отмечен — нужен полив');
     var email = ECO.contactEmail();
     var patron = ECO.patronOf(tree);
     if (patron) {
@@ -357,7 +357,7 @@
     // ----- полив: отметка — запись осмотра в полевом режиме, видна всем после добавления координатором -----
     content.appendChild(el('section', { className: 'card', attrs: { id: 'water' } }, [
       el('h2', { text: 'Полив' }),
-      el('p', { text: lastWater ? 'Последний полив: ' + ECO.formatDate(lastWater) : 'Полив ещё не отмечен.' }),
+      el('p', { text: lastWater ? 'Последний полив: ' + ECO.formatDate(lastWater) : 'Полив не отмечен — нужен полив.' }),
       el('a', {
         href: '../tools/field.html?id=' + encodeURIComponent(tree.id) + '&action=water',
         className: 'btn btn--water btn--block',
